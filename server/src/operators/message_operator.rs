@@ -1,3 +1,6 @@
+use std::sync::atomic::AtomicU16;
+use std::sync::{Arc, Mutex};
+
 #[cfg(not(feature = "hallucination-detection"))]
 use crate::data::models::DummyHallucinationScore;
 use crate::data::models::{
@@ -45,6 +48,7 @@ use simple_server_timing_header::Timer;
 use ureq::json;
 
 use super::clickhouse_operator::{get_latency_from_header, EventQueue};
+use super::parse_operator::parse_streaming_completetion;
 use super::search_operator::{
     hybrid_search_over_groups, search_chunks_query, search_hybrid_chunks, search_over_groups_query,
     ParsedQuery, ParsedQueryTypes,
@@ -128,6 +132,19 @@ pub async fn create_messages_query(
     Ok(())
 }
 
+const STRUCTURE_SYSTEM_PROMPT: &str = r#"
+Respond before you start generating with the documents that you plan to use to generate your response.
+YOU MUST DO THIS BEFORE YOU CONTINUE TO GENERATE A RESPONSE.
+
+Example:
+User: 
+Here's my prompt: what about for spreadsheets \n\n Use the following retrieved documents to respond briefly and accurately: {"doc": 1, "text": "chunk text..", "link": "chunk link.." }\n\n{"doc": 2, "text": "chunk text..", "link": "chunk link.." }... etc
+
+Assistant:
+documents: [1,2]
+...continue with model response
+"#;
+
 pub async fn create_generic_system_message(
     system_prompt: String,
     messages_topic_id: uuid::Uuid,
@@ -139,7 +156,7 @@ pub async fn create_generic_system_message(
             .await?;
 
     let system_message = Message::from_details(
-        system_prompt,
+        format!("{}\n\n{}", system_prompt, STRUCTURE_SYSTEM_PROMPT),
         topic.id,
         0,
         "system".into(),
@@ -709,20 +726,6 @@ pub async fn stream_response(
             .streaming(response_stream));
     }
 
-    let chunk_data = chunk_metadatas
-        .clone()
-        .into_iter()
-        .map(|x| {
-            let mut json = serde_json::to_value(&x).unwrap_or_default();
-            escape_quotes(&mut json);
-            json.to_string()
-        })
-        .collect();
-
-    let mut chunk_metadatas_stringified =
-        serde_json::to_string(&chunk_metadatas).expect("Failed to serialize citation chunks");
-    let mut chunk_metadatas_stringified1 = chunk_metadatas_stringified.clone();
-
     let rag_content = chunk_metadatas
         .iter()
         .enumerate()
@@ -894,21 +897,6 @@ pub async fn stream_response(
             .or(llm_options.stop_tokens.map(StopToken::Array));
     }
 
-    if !chunk_metadatas_stringified.is_empty() {
-        chunk_metadatas_stringified = if create_message_req_payload
-            .llm_options
-            .as_ref()
-            .map(|x| x.completion_first)
-            .unwrap_or(Some(false))
-            .unwrap_or(false)
-        {
-            format!("||{}", chunk_metadatas_stringified.replace("||", ""))
-        } else {
-            format!("{}||", chunk_metadatas_stringified.replace("||", ""))
-        };
-        chunk_metadatas_stringified1.clone_from(&chunk_metadatas_stringified);
-    }
-
     let query_id = uuid::Uuid::new_v4();
 
     if create_message_req_payload
@@ -933,51 +921,82 @@ pub async fn stream_response(
             .get(0)
             .map(|chat_completion_choice| chat_completion_choice.message.clone())
         {
-            Some(ChatMessage::User {
-                content: ChatMessageContent::Text(text),
-                ..
-            })
-            | Some(ChatMessage::System {
-                content: ChatMessageContent::Text(text),
-                ..
-            })
-            | Some(ChatMessage::Assistant {
+            Some(ChatMessage::Assistant {
                 content: Some(ChatMessageContent::Text(text)),
                 ..
-            }) => text.clone(),
-            _ => "".to_string(),
+            }) => {
+                let parsed: serde_json::Value = serde_json::from_str(text)
+                    .map_err(|_| ServiceError::BadRequest("Invalid JSON response".to_string()))?;
+
+                let used_docs = parsed["documents"].as_array().ok_or_else(|| {
+                    ServiceError::BadRequest("Missing documents array".to_string())
+                })?;
+
+                let rag_message = parsed["message"]
+                    .as_str()
+                    .ok_or_else(|| ServiceError::BadRequest("Missing message".to_string()))?;
+
+                // Filter chunk_metadatas to only include used documents
+                let filtered_chunks: Vec<_> = used_docs
+                    .iter()
+                    .filter_map(|doc_idx| {
+                        doc_idx
+                            .as_u64()
+                            .and_then(|idx| chunk_metadatas.get(idx as usize - 1))
+                            .cloned()
+                    })
+                    .collect();
+
+                (rag_message.to_string(), filtered_chunks)
+            }
+            _ => {
+                return Err(ServiceError::BadRequest("Invalid response format".to_string()).into())
+            }
+        };
+
+        let (response_text, filtered_chunks) = completion_content;
+
+        let filtered_chunks_stringified = serde_json::to_string(&filtered_chunks)
+            .expect("Failed to serialize filtered citation chunks");
+
+        let final_response = if create_message_req_payload
+            .llm_options
+            .as_ref()
+            .map(|x| x.completion_first)
+            .unwrap_or(Some(false))
+            .unwrap_or(false)
+        {
+            format!("{}||{}", response_text, filtered_chunks_stringified)
+        } else {
+            format!("{}||{}", filtered_chunks_stringified, response_text)
         };
 
         let new_message = models::Message::from_details(
-            format!(
-                "{}{}",
-                chunk_metadatas_stringified,
-                completion_content.clone()
-            ),
+            final_response.clone(),
             topic_id,
             next_message_order()
                 .try_into()
                 .expect("usize to i32 conversion should always succeed"),
             "assistant".to_string(),
-            None,
-            Some(
-                completion_content
-                    .len()
-                    .try_into()
-                    .expect("usize to i32 conversion should always succeed"),
-            ),
+            assistant_completion
+                .usage
+                .as_ref()
+                .map(|usg| usg.prompt_tokens as i32),
+            assistant_completion
+                .usage
+                .map(|usg| usg.completion_tokens.unwrap_or(0) as i32),
             dataset.id,
             query_id,
         );
 
         #[cfg(feature = "hallucination-detection")]
         let score = {
-            let docs = chunk_metadatas
+            let docs = filtered_chunks
                 .iter()
                 .map(|x| x.chunk_html.clone().unwrap_or_default())
                 .collect::<Vec<String>>();
             hallucination_detector
-                .detect_hallucinations(&clean_markdown(&completion_content), &docs)
+                .detect_hallucinations(&clean_markdown(&response_text), &docs)
                 .await
                 .map_err(|err| {
                     ServiceError::BadRequest(format!("Failed to detect hallucinations: {}", err))
@@ -990,6 +1009,15 @@ pub async fn stream_response(
             detected_hallucinations: vec![],
         };
 
+        let filtered_chunks_data = filtered_chunks
+            .iter()
+            .map(|x| {
+                let mut json = serde_json::to_value(x).unwrap_or_default();
+                escape_quotes(&mut json);
+                json.to_string()
+            })
+            .collect::<Vec<String>>();
+
         let clickhouse_rag_event = RagQueryEventClickhouse {
             id: query_id,
             created_at: time::OffsetDateTime::now_utc(),
@@ -997,11 +1025,11 @@ pub async fn stream_response(
             search_id: search_event.id,
             top_score: search_event.top_score,
             results: vec![],
-            json_results: chunk_data,
+            json_results: filtered_chunks_data,
             user_message: user_message_query.clone(),
             query_rating: String::new(),
             rag_type: "all_chunks".to_string(),
-            llm_response: completion_content.clone(),
+            llm_response: response_text.clone(),
             user_id: create_message_req_payload
                 .user_id
                 .clone()
@@ -1010,14 +1038,6 @@ pub async fn stream_response(
             detected_hallucinations: score.detected_hallucinations,
         };
 
-        let response_string = if create_message_req_payload
-            .llm_options
-            .is_some_and(|llm_options| llm_options.completion_first.unwrap_or(false))
-        {
-            format!("{}{}", completion_content, chunk_metadatas_stringified)
-        } else {
-            format!("{}{}", chunk_metadatas_stringified, completion_content)
-        };
         if !dataset_config.DISABLE_ANALYTICS {
             event_queue
                 .send(ClickHouseEvent::RagQueryEvent(clickhouse_rag_event.clone()))
@@ -1028,7 +1048,7 @@ pub async fn stream_response(
         return Ok(HttpResponse::Ok()
             .insert_header(("X-TR-Query", user_message))
             .insert_header(("TR-QueryID", query_id.to_string()))
-            .json(response_string));
+            .json(final_response));
     }
 
     let (s, r) = unbounded::<String>();
@@ -1047,14 +1067,36 @@ pub async fn stream_response(
         let chunk_v: Vec<String> = r.iter().collect();
         let completion = chunk_v.join("");
 
-        let message_to_be_stored = if completion_first {
-            format!("{}{}", completion, chunk_metadatas_stringified)
+        #[allow(unused_variables)]
+        let (response, chunks) = if completion_first {
+            let chunk_data: Vec<ChunkMetadataStringTagSet> =
+                serde_json::from_str(completion.split("||").collect::<Vec<&str>>()[1])
+                    .unwrap_or_default();
+            (
+                completion.split("||").collect::<Vec<&str>>()[0].to_string(),
+                chunk_data,
+            )
         } else {
-            format!("{}{}", chunk_metadatas_stringified, completion)
+            let chunk_data: Vec<ChunkMetadataStringTagSet> =
+                serde_json::from_str(completion.split("||").collect::<Vec<&str>>()[0])
+                    .unwrap_or_default();
+            (
+                completion.split("||").collect::<Vec<&str>>()[1].to_string(),
+                chunk_data,
+            )
         };
 
+        let chunk_data: Vec<String> = chunks
+            .iter()
+            .map(|x| {
+                let mut json = serde_json::to_value(x).unwrap_or_default();
+                escape_quotes(&mut json);
+                json.to_string()
+            })
+            .collect();
+
         let new_message = models::Message::from_details(
-            message_to_be_stored,
+            completion.clone(),
             topic_id,
             next_message_order().try_into().unwrap(),
             "assistant".to_string(),
@@ -1063,16 +1105,17 @@ pub async fn stream_response(
             dataset.id,
             query_id_arb,
         );
+
         if !dataset_config.DISABLE_ANALYTICS {
             #[cfg(feature = "hallucination-detection")]
             let score = {
-                let docs = chunk_metadatas
+                let docs = chunks
                     .iter()
                     .map(|x| x.chunk_html.clone().unwrap_or_default())
                     .collect::<Vec<String>>();
 
                 hallucination_detector
-                    .detect_hallucinations(&clean_markdown(&completion), &docs)
+                    .detect_hallucinations(&clean_markdown(&response), &docs)
                     .await
                     .unwrap_or(HallucinationScore {
                         total_score: 0.0,
@@ -1117,11 +1160,12 @@ pub async fn stream_response(
     });
 
     let chat_completion_timeout = std::env::var("CHAT_COMPLETION_TIMEOUT_SECS")
-        .unwrap_or("10".to_string())
+        .unwrap_or("60".to_string())
         .parse::<u64>()
-        .unwrap_or(10);
+        .unwrap_or(60);
 
-    let chunk_stream = stream::iter(vec![Ok(Bytes::from(chunk_metadatas_stringified1))]);
+    let state = Arc::new(AtomicU16::new(0));
+    let documents = Arc::new(Mutex::new(vec![]));
     let completion_stream = stream
         .take_until(tokio::time::sleep(std::time::Duration::from_secs(chat_completion_timeout)))
         .map(move |response| -> Result<Bytes, actix_web::Error> {
@@ -1131,25 +1175,46 @@ pub async fn stream_response(
                 .get(0)
                 .map(|choice| {
                     if choice.finish_reason.is_some() {
-                        Some("".to_string())
+                        let docs = documents.lock().unwrap();
+                        if !docs.is_empty() && completion_first {
+                            let filtered_chunks = chunk_metadatas.iter().enumerate()
+                                    .filter_map(|(idx, chunk)| {
+                                        if docs.contains(&(idx as u32)) {
+                                            Some(chunk.clone())
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect::<Vec<ChunkMetadataStringTagSet>>();
+                                Some(format!("||{}", serde_json::to_string(&filtered_chunks).unwrap_or_default()))
+                        } else {
+                            Some("".to_string())
+                        }
                     } else {
                         match &choice.delta {
-                            DeltaChatMessage::User {
-                                content: ChatMessageContent::Text(text),
-                                ..
-                            }
-                            | DeltaChatMessage::System {
-                                content: ChatMessageContent::Text(text),
-                                ..
-                            }
-                            | DeltaChatMessage::Assistant {
+                            DeltaChatMessage::Assistant {
                                 content: Some(ChatMessageContent::Text(text)),
                                 ..
                             }
                             | DeltaChatMessage::Untagged {
                                 content: Some(ChatMessageContent::Text(text)),
                                 ..
-                            } => Some(text.clone()),
+                            } => {
+                                let (text, docs) = parse_streaming_completetion(text, state.clone(), documents.clone());
+                                if let Some(docs) = docs {
+                                    if !completion_first {
+                                        let filtered_chunks = chunk_metadatas.iter().enumerate().filter_map(|(idx, chunk)| {
+                                            if docs.contains(&(idx as u32)) {
+                                                Some(chunk.clone())
+                                            } else {
+                                                None
+                                            }
+                                        }).collect::<Vec<ChunkMetadataStringTagSet>>();
+                                        return Some(format!("{}||", serde_json::to_string(&filtered_chunks).unwrap_or_default()));
+                                    }
+                                }
+                                text.clone()
+                            },
                             _ => {
                                 log::error!("Delta of first choice did not have text or was either Tool or Function {:?}", choice);
                                 None
@@ -1171,23 +1236,10 @@ pub async fn stream_response(
         .into())
     });
 
-    if create_message_req_payload
-        .llm_options
-        .as_ref()
-        .map(|x| x.completion_first)
-        .unwrap_or(Some(false))
-        .unwrap_or(false)
-    {
-        return Ok(HttpResponse::Ok()
-            .insert_header(("X-TR-Query", user_message))
-            .insert_header(("TR-QueryID", query_id.to_string()))
-            .streaming(completion_stream.chain(chunk_stream)));
-    }
-
     Ok(HttpResponse::Ok()
         .insert_header(("X-TR-Query", user_message))
         .insert_header(("TR-QueryID", query_id.to_string()))
-        .streaming(chunk_stream.chain(completion_stream)))
+        .streaming(completion_stream))
 }
 
 pub async fn get_topic_string(

@@ -3,7 +3,13 @@ use ndarray::Array2;
 use regex::Regex;
 use regex_split::RegexSplit;
 use scraper::{Html, Selector};
-use std::cmp;
+use std::{
+    cmp,
+    sync::{
+        atomic::{AtomicU16, Ordering},
+        Arc, Mutex,
+    },
+};
 
 use crate::errors::ServiceError;
 
@@ -160,6 +166,44 @@ pub fn average_embeddings(embeddings: Vec<Vec<f32>>) -> Result<Vec<f32>, Service
     })?;
 
     Ok((arr.sum_axis(ndarray::Axis(0)) / (embeddings.len() as f32)).to_vec())
+}
+
+/// Parse the response from the LLM server
+///
+/// State Table
+/// 0 - Unkown
+/// 1 - Documents
+/// 2 - Message
+pub fn parse_streaming_completetion(
+    response: &str,
+    state: Arc<AtomicU16>,
+    documents: Arc<Mutex<Vec<u32>>>,
+) -> (Option<String>, Option<Vec<u32>>) {
+    const STATE_INITIAL: u16 = 0;
+    const STATE_COLLECTING: u16 = 1;
+    const STATE_COMPLETE: u16 = 2;
+
+    match state.load(Ordering::Relaxed) {
+        STATE_COMPLETE => (Some(response.into()), None),
+        STATE_INITIAL if response.bytes().any(|b| matches!(b, b'd' | b'D')) => {
+            state.store(STATE_COLLECTING, Ordering::Relaxed);
+            (None, None)
+        }
+        STATE_COLLECTING => {
+            if response.as_bytes().contains(&b']') {
+                state.store(STATE_COMPLETE, Ordering::Relaxed);
+                (None, Some(documents.lock().unwrap().clone()))
+            } else if response.bytes().all(|b| b.is_ascii_digit()) {
+                if let Ok(num) = response.parse::<u32>() {
+                    documents.lock().unwrap().push(num - 1);
+                }
+                (None, None)
+            } else {
+                (None, None)
+            }
+        }
+        _ => (None, None),
+    }
 }
 
 #[cfg(test)]

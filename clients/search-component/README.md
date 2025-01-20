@@ -103,7 +103,7 @@ declare module "solid-js" {
 | floatingSearchIconPosition | "left" or "right"                                                                              | "right"                                                               |     
 | showFloatingSearchIcon     | boolean                                                                                        | false                                                                 |     
 | showFloatingInput          | boolean                                                                                        | false                                                                 |      
-| buttonTriggers             | { selector: <"query-selector">, mode: "chat"|"search" }                                        | []                                                                    |      
+| buttonTriggers             | [{ selector: <"query-selector">, mode: "chat"|"search" }]                                      | []                                                                    |      
 | hideopenButton             | boolean                                                                                        | false                                                                 |
 
 
