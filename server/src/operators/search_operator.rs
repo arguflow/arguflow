@@ -1267,7 +1267,7 @@ pub async fn retrieve_chunks_for_groups(
 
                     let mut highlights: Option<Vec<String>> = None;
                     if let Some(highlight_options)  = &data.highlight_options {
-                        if highlight_options.highlight_results.unwrap_or(true) && !data.slim_chunks.unwrap_or(false) && !matches!(data.query, QueryTypes::Multi(_)) {
+                        if highlight_options.highlight_results.unwrap_or(true) && !data.slim_chunks.unwrap_or(false) && !matches!(data.query, QueryTypes::Multi(_)) && data.query.to_single_query().is_ok() {
                             let (highlighted_chunk_html, highlighted_snippets) = match highlight_options.highlight_strategy {
                                 Some(HighlightStrategy::V1) => {
                                     get_highlights(
