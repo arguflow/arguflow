@@ -6,6 +6,7 @@ import {
   ChevronDownIcon,
   ChevronUpicon,
   LoadingIcon,
+  MagnifyingGlassIcon,
   PhotoIcon,
   XIcon,
 } from "./icons";
@@ -14,8 +15,17 @@ import {
   useModalState,
 } from "../utils/hooks/modal-context";
 import { toBase64 } from "./Search/UploadImage";
-import { getPresignedUrl, uploadFile } from "../utils/trieve";
+import {
+  getPresignedUrl,
+  groupSearchWithTrieve,
+  uploadFile,
+} from "../utils/trieve";
 import { ToolFunctionParameter } from "trieve-ts-sdk";
+import { getFingerprint } from "@thumbmarkjs/thumbmarkjs";
+import Markdown from "react-markdown";
+import { urlWordRegex } from "./Chat/ResponseMessage";
+import { GroupChunk } from "../utils/types";
+import { ProductGroupItem } from "./Search/ProductGroupItem";
 
 export const ActiveFilterPills = () => {
   const { selectedSidebarFilters, setSelectedSidebarFilters } = useModalState();
@@ -225,10 +235,15 @@ export const FilterButton = ({
   );
 };
 
+export interface SearchQueryState {
+  query: string;
+  loading: boolean;
+}
+
 export interface InferenceFilterFormStep {
   title: string;
   description: string;
-  type: "image" | "tags" | "component";
+  type: "image" | "tags" | "search_results";
   placeholder?: string;
   filterSidebarSectionKey?: string;
   prompt?: string;
@@ -242,6 +257,13 @@ export const InferenceFiltersForm = ({ steps }: InferenceFiltersFormProps) => {
     selectedSidebarFilters,
   } = useModalState();
   const [images, setImages] = useState<Record<string, File>>({});
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [searchQueries, setSearchQueries] = useState<
+    Record<string, SearchQueryState>
+  >({});
+  const [searchResults, setSearchResults] = useState<
+    Record<string, GroupChunk[][]>
+  >({});
   const [loadingStates, setLoadingStates] = useState<Record<string, string>>(
     {}
   );
@@ -290,6 +312,10 @@ export const InferenceFiltersForm = ({ steps }: InferenceFiltersFormProps) => {
             base64File
           );
           const imageUrl = await getPresignedUrl(trieveSDK, fileId);
+          setImageUrls((prev) => ({
+            ...prev,
+            [prevStep.title]: imageUrl,
+          }));
 
           setLoadingStates((prev) => ({
             ...prev,
@@ -350,6 +376,127 @@ export const InferenceFiltersForm = ({ steps }: InferenceFiltersFormProps) => {
       toolCallAbortController.abort();
     };
   }, [images]);
+
+  useEffect(() => {
+    const firstMessageInferenceAbortController = new AbortController();
+    for (let i = 1; i < steps.length; i++) {
+      if (steps[i].type === "search_results") {
+        const prevFilter = steps[i - 1].filterSidebarSectionKey;
+        const selectedTags = selectedSidebarFilters[prevFilter ?? ""];
+        if (!selectedTags?.length) {
+          continue;
+        }
+
+        (async () => {
+          setLoadingStates((prev) => ({
+            ...prev,
+            [steps[i].title]: "Figuring out what will look good...",
+          }));
+          setSearchQueries((prev) => ({
+            ...prev,
+            [steps[i].title]: {
+              query: "",
+              loading: true,
+            },
+          }));
+
+          const fingerprint = await getFingerprint();
+          const replacementMaterialDescriptionReader =
+            await trieveSDK.ragOnChunkReader(
+              {
+                chunk_ids: [],
+                image_urls: Object.values(imageUrls).filter((url) => url),
+                prev_messages: [
+                  {
+                    content: `${steps[i].prompt ?? ""} ${selectedTags.join(", ")}`,
+                    role: "user",
+                  },
+                ],
+                prompt: "",
+                stream_response: true,
+                user_id: fingerprint.toString(),
+              },
+              firstMessageInferenceAbortController.signal
+            );
+          setLoadingStates((prev) => ({
+            ...prev,
+            [steps[i].title]: "Generating search query...",
+          }));
+
+          let done = false;
+          let textInStream = "";
+          while (!done) {
+            const { value, done: doneReading } =
+              await replacementMaterialDescriptionReader.read();
+            if (doneReading) {
+              done = doneReading;
+              setSearchQueries((prev) => ({
+                ...prev,
+                [steps[i].title]: {
+                  query: textInStream,
+                  loading: false,
+                },
+              }));
+            } else if (value) {
+              setLoadingStates((prev) => ({
+                ...prev,
+                [steps[i].title]: "idle",
+              }));
+              const decoder = new TextDecoder();
+              const newText = decoder.decode(value);
+              textInStream += newText;
+              setSearchQueries((prev) => ({
+                ...prev,
+                [steps[i].title]: {
+                  query: textInStream,
+                  loading: false,
+                },
+              }));
+            }
+          }
+        })();
+      }
+    }
+
+    return () => {
+      firstMessageInferenceAbortController.abort();
+    };
+  }, [selectedSidebarFilters]);
+
+  useEffect(() => {
+    for (let i = 1; i < steps.length; i++) {
+      if (
+        steps[i].type === "search_results" &&
+        searchQueries[steps[i].title]?.loading === false &&
+        searchQueries[steps[i].title]?.query.length > 0
+      ) {
+        (async () => {
+          const results = await groupSearchWithTrieve({
+            query_string: searchQueries[steps[i].title].query,
+            searchOptions: props.searchOptions,
+            trieve: trieveSDK,
+            ...Object.values(selectedSidebarFilters).flat(),
+            type: props.type,
+          });
+
+          const groupMap = new Map<string, GroupChunk[]>();
+          results.groups.forEach((group) => {
+            const title = group.chunks[0].chunk.metadata?.title;
+            if (groupMap.has(title)) {
+              groupMap.get(title)?.push(group);
+            } else {
+              groupMap.set(title, [group]);
+            }
+          });
+
+          setSearchResults((prev) => ({
+            ...prev,
+            [steps[i].title]: Array.from(groupMap.values()),
+          }));
+        })();
+      }
+    }
+  }, [searchQueries]);
 
   return (
     <div className="trieve-inference-filters-form">
@@ -440,7 +587,10 @@ export const InferenceFiltersForm = ({ steps }: InferenceFiltersFormProps) => {
               </p>
             </div>
 
-            <div className="trieve-inference-filters-step-tags">
+            <div
+              className="trieve-inference-filters-step-tags"
+              data-input-field-type={step.type}
+            >
               {filterOptions[step.filterSidebarSectionKey ?? ""]?.map((tag) => (
                 <button
                   className="trieve-inference-filters-step-tag"
@@ -482,6 +632,61 @@ export const InferenceFiltersForm = ({ steps }: InferenceFiltersFormProps) => {
                     <CheckIcon />
                   </i>
                 </button>
+              ))}
+            </div>
+
+            <div
+              className="trieve-inference-filters-search-query"
+              data-input-field-type={step.type}
+            >
+              <div
+                data-is-empty={
+                  (searchQueries[step.title]?.query.length ?? 0) === 0
+                }
+                className="trieve-inference-filters-search-query-text"
+              >
+                <div className="trieve-inference-filters-search-query-icon">
+                  <MagnifyingGlassIcon />
+                </div>
+                <Markdown
+                  className="code-markdown"
+                  components={{
+                    code: (codeProps) => {
+                      const { children } = codeProps || {};
+                      if (!children) return null;
+                      return children?.toString();
+                    },
+                    a: (anchorProps) => {
+                      const { children, href, title } = anchorProps || {};
+                      if (!children) return null;
+                      return (
+                        <a
+                          href={href}
+                          target={props.openLinksInNewTab ? "_blank" : ""}
+                          title={title}
+                        >
+                          {children?.toString()}
+                        </a>
+                      );
+                    },
+                  }}
+                  key={step.title}
+                >
+                  {searchQueries[step.title]?.query.length > 0
+                    ? searchQueries[step.title].query.replace(urlWordRegex, "")
+                    : ""}
+                </Markdown>
+              </div>
+            </div>
+
+            <div className="trieve-inference-filters-search-results">
+              {searchResults[step.title]?.map((result) => (
+                <ProductGroupItem
+                  key={result[0].group.id}
+                  group={result}
+                  index={index}
+                  requestID={""}
+                />
               ))}
             </div>
           </div>

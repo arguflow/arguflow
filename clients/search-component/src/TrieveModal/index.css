@@ -1560,6 +1560,26 @@ body {
             }
           }
         }
+
+        .trieve-inference-filters-search-query {
+          display: none;
+
+          &[data-input-field-type="search_results"] {
+            display: block;
+          }
+
+          .trieve-inference-filters-search-query-text {
+            @apply tv-flex tv-items-center tv-gap-2 tv-border tv-rounded-lg tv-p-2 tv-w-full tv-border-zinc-500;
+
+            &[data-is-empty="true"] {
+              display: none;
+            }
+
+            .trieve-inference-filters-search-query-icon {
+              @apply tv-w-5 tv-h-5 tv-mr-1 tv-min-w-5;
+            }
+          }
+        }
       }
 
       .trieve-inference-filters-step-loading-container {

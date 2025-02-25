@@ -81,6 +81,8 @@ export const ResponseMessage = ({
   );
 };
 
+export const urlWordRegex = /(?:^|\s)http\S+\s*/g;
+
 export const Message = ({
   message,
   idx,
@@ -88,8 +90,6 @@ export const Message = ({
   idx: number;
   message: Message;
 }) => {
-  const urlWordRegex = /(?:^|\s)http\S+\s*/g;
-
   const { rateChatCompletion } = useChatState();
   const [positive, setPositive] = React.useState<boolean | null>(null);
   const [copied, setCopied] = React.useState<boolean>(false);

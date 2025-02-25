@@ -54,10 +54,48 @@ export default function ECommerce() {
                     key: "categories",
                     title: "Categories",
                     options: [
-                      { label: "Carpets", tag: "carpets" },
-                      { label: "Flooring", tag: "flooring" },
-                      { label: "Paint", tag: "paint" },
-                      { label: "Countertops", tag: "countertop" },
+                      {
+                        label: "Indoor Wall",
+                        tag: "Indoor Wall",
+                        description:
+                          "Set this to true anytime the image seems to include walls.",
+                      },
+                      {
+                        label: "Flooring",
+                        tag: "Flooring",
+                        description:
+                          "Set this to true anytime the image seems to include floors.",
+                      },
+                      {
+                        label: "Countertops",
+                        tag: "Countertops",
+                        description:
+                          "Set this to true anytime the image seems to include countertops.",
+                      },
+                      {
+                        label: "Cabinets",
+                        tag: "Cabinets",
+                        description:
+                          "Set this to true anytime the image seems to include cabinets.",
+                      },
+                      {
+                        label: "Hardware",
+                        tag: "Hardware",
+                        description:
+                          "Set this to true anytime the image seems to include or like it could include hardware like cabinet handles or knobs.",
+                      },
+                      {
+                        label: "Sinks",
+                        tag: "Sinks",
+                        description:
+                          "Set this to true anytime the image seems to include sinks.",
+                      },
+                      {
+                        label: "Rugs",
+                        tag: "Rugs",
+                        description:
+                          "Set this to true anytime the image seems to include or like it could include a rug.",
+                      },
                     ],
                     selectionType: "multiple",
                     filterType: "match_any",
@@ -97,9 +135,9 @@ export default function ECommerce() {
                     title: "View Recommended Materials",
                     description:
                       "Our AI will recommend materials based on your image and which materials you are replacing.",
-                    type: "tags",
+                    type: "search_results",
                     prompt:
-                      "I am looking to replace the following materials from the image I shared, please describe what those materials should be in terms of color, luminance, and style:\n\n",
+                      "Write 1 sentence describing the ideal replacements in terms of color, luminance, and style of ONLY the following materials:\n\n",
                   },
                 ],
               },
