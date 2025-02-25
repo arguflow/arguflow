@@ -1,10 +1,10 @@
 import { startTransition } from "react";
-import { ModalProps, SearchModes } from "./modal-context";
+import { ModalProps, SearchModes, useModalState } from "./modal-context";
 
 export const setClickTriggers = (
   setOpen: (open: boolean) => void,
   setMode: React.Dispatch<React.SetStateAction<SearchModes>>,
-  props: ModalProps
+  props: ModalProps,
 ) => {
   const removeAllClickListeners = (selector: string): Element | null => {
     const element: Element | null = document.querySelector(selector);
@@ -27,6 +27,16 @@ export const setClickTriggers = (
     }
 
     if (element) {
+      const { trieveSDK } = useModalState();
+      trieveSDK.sendAnalyticsEvent({
+        event_name: `${props.componentName}_click`,
+        event_type: "click",
+        clicked_items: {
+          chunk_id: `${props.componentName}`,
+          position: 0,
+        },
+      });
+
       element.addEventListener("click", () => {
         startTransition(() => {
           setMode(trigger.mode);

@@ -113,10 +113,10 @@ export type ModalProps = {
   zIndex?: number;
   showFloatingButton?: boolean;
   floatingButtonPosition?:
-  | "top-left"
-  | "top-right"
-  | "bottom-left"
-  | "bottom-right";
+    | "top-left"
+    | "top-right"
+    | "bottom-left"
+    | "bottom-right";
   floatingSearchIconPosition?: "left" | "right";
   showFloatingSearchIcon?: boolean;
   disableFloatingSearchIconClick?: boolean;
@@ -135,6 +135,7 @@ export type ModalProps = {
   hideOverlay?: boolean;
   hidePrice?: boolean;
   hideChunkHtml?: boolean;
+  componentName?: string;
 };
 
 const defaultProps = {
@@ -193,6 +194,7 @@ const defaultProps = {
   hideOverlay: false,
   hidePrice: false,
   hideChunkHtml: false,
+  componentName: "Trieve Search Component",
 } satisfies ModalProps;
 
 const ModalContext = createContext<{

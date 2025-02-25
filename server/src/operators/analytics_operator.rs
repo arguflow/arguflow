@@ -12,12 +12,11 @@ use crate::{
         SearchLatencyGraphClickhouse, SearchQueriesWithClicksCTRResponse,
         SearchQueriesWithClicksCTRResponseClickhouse, SearchQueriesWithoutClicksCTRResponse,
         SearchQueriesWithoutClicksCTRResponseClickhouse, SearchQueryEvent,
-        SearchQueryEventClickhouse, SearchQueryRating, SearchSortBy, SearchTypeCount, SortOrder,
-        TopDatasetsResponse, TopDatasetsResponseClickhouse, UsageGraphPoint,
-        UsageGraphPointClickhouse,
+        SearchQueryEventClickhouse, SearchSortBy, SearchTypeCount, SortOrder, TopDatasetsResponse,
+        TopDatasetsResponseClickhouse, UsageGraphPoint, UsageGraphPointClickhouse,
     },
     errors::ServiceError,
-    handlers::analytics_handler::{GetTopDatasetsRequestBody, RateQueryRequest},
+    handlers::analytics_handler::GetTopDatasetsRequestBody,
 };
 use actix_web::web;
 use diesel::prelude::*;
@@ -1390,72 +1389,6 @@ pub async fn get_recommendations_without_clicks_query(
         clickhouse_query.into_iter().map(|q| q.into()).collect();
 
     Ok(CTRRecommendationsWithoutClicksResponse { recommendations })
-}
-
-pub async fn set_search_query_rating_query(
-    data: RateQueryRequest,
-    dataset_id: uuid::Uuid,
-    clickhouse_client: &clickhouse::Client,
-) -> Result<(), ServiceError> {
-    let rating = SearchQueryRating {
-        rating: data.rating,
-        note: data.note,
-    };
-
-    let stringified_data = serde_json::to_string(&rating).unwrap_or_default();
-
-    clickhouse_client
-        .query(
-            "ALTER TABLE search_queries
-        UPDATE query_rating = ?
-        WHERE id = ? AND dataset_id = ?",
-        )
-        .bind(stringified_data)
-        .bind(data.query_id)
-        .bind(dataset_id)
-        .execute()
-        .await
-        .map_err(|err| {
-            log::error!("Error altering to ClickHouse search_queries: {:?}", err);
-            ServiceError::InternalServerError(
-                "Error altering to ClickHouse search_queries".to_string(),
-            )
-        })?;
-
-    Ok(())
-}
-
-pub async fn set_rag_query_rating_query(
-    data: RateQueryRequest,
-    dataset_id: uuid::Uuid,
-    clickhouse_client: &clickhouse::Client,
-) -> Result<(), ServiceError> {
-    let rating = SearchQueryRating {
-        rating: data.rating,
-        note: data.note,
-    };
-
-    let stringified_data = serde_json::to_string(&rating).unwrap_or_default();
-
-    clickhouse_client
-        .query(
-            "ALTER TABLE rag_queries
-        UPDATE query_rating = ?
-        WHERE id = ? AND dataset_id = ?",
-        )
-        .bind(stringified_data)
-        .bind(data.query_id)
-        .bind(dataset_id)
-        .execute()
-        .await
-        .map_err(|err| {
-            log::error!("Error altering to ClickHouse rag_queries: {:?}", err);
-            ServiceError::InternalServerError(
-                "Error altering to ClickHouse rag_queries".to_string(),
-            )
-        })?;
-
-    Ok(())
 }
 
 pub async fn get_top_datasets_query(

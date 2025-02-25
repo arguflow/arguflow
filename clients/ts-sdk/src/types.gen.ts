@@ -2421,6 +2421,7 @@ export type Range = {
 export type RangeCondition = number;
 
 export type RateQueryRequest = {
+    metadata?: unknown;
     note?: (string) | null;
     query_id: string;
     rating: number;
@@ -2937,6 +2938,7 @@ export type SearchQueryEvent = {
 };
 
 export type SearchQueryRating = {
+    metadata?: unknown;
     note?: (string) | null;
     rating: number;
 };

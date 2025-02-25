@@ -13982,6 +13982,9 @@
           "rating"
         ],
         "properties": {
+          "metadata": {
+            "nullable": true
+          },
           "note": {
             "type": "string",
             "nullable": true
@@ -15943,6 +15946,9 @@
           "rating"
         ],
         "properties": {
+          "metadata": {
+            "nullable": true
+          },
           "note": {
             "type": "string",
             "nullable": true
