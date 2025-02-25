@@ -962,12 +962,33 @@ export type Dataset = {
 };
 
 export type DatasetAnalytics = {
+    /**
+     * Average latency of search queries
+     */
     avg_latency: number;
+    /**
+     * 50th percentile latency of search queries
+     */
     p50: number;
+    /**
+     * 95th percentile latency of search queries
+     */
     p95: number;
+    /**
+     * 99th percentile latency of search queries
+     */
     p99: number;
-    percent_thumbs_down: number;
-    percent_thumbs_up: number;
+    /**
+     * Total number of searches with a negative rating
+     */
+    total_negative_ratings: number;
+    /**
+     * Total number of searches with a positive rating
+     */
+    total_positive_ratings: number;
+    /**
+     * Total number of search queries
+     */
     total_queries: number;
 };
 
@@ -2401,8 +2422,14 @@ export type RagQueryEvent = {
 };
 
 export type RagQueryRatingsResponse = {
-    percent_thumbs_down: number;
-    percent_thumbs_up: number;
+    /**
+     * Total number of negative RAG ratings
+     */
+    total_negative_ratings: number;
+    /**
+     * Total number of positive RAG ratings
+     */
+    total_positive_ratings: number;
 };
 
 export type RagQueryResponse = {

@@ -9829,37 +9829,44 @@
           "p99",
           "p95",
           "p50",
-          "percent_thumbs_up",
-          "percent_thumbs_down"
+          "total_positive_ratings",
+          "total_negative_ratings"
         ],
         "properties": {
           "avg_latency": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "Average latency of search queries"
           },
           "p50": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "50th percentile latency of search queries"
           },
           "p95": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "95th percentile latency of search queries"
           },
           "p99": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "99th percentile latency of search queries"
           },
-          "percent_thumbs_down": {
+          "total_negative_ratings": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "Total number of searches with a negative rating"
           },
-          "percent_thumbs_up": {
+          "total_positive_ratings": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "Total number of searches with a positive rating"
           },
           "total_queries": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "Total number of search queries"
           }
         }
       },
@@ -13884,17 +13891,19 @@
         "type": "object",
         "title": "RagQueryRatingsResponse",
         "required": [
-          "percent_thumbs_up",
-          "percent_thumbs_down"
+          "total_positive_ratings",
+          "total_negative_ratings"
         ],
         "properties": {
-          "percent_thumbs_down": {
-            "type": "number",
-            "format": "double"
+          "total_negative_ratings": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total number of negative RAG ratings"
           },
-          "percent_thumbs_up": {
-            "type": "number",
-            "format": "double"
+          "total_positive_ratings": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total number of positive RAG ratings"
           }
         }
       },

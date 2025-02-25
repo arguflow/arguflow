@@ -1,5 +1,6 @@
 import { startTransition } from "react";
-import { ModalProps, SearchModes, useModalState } from "./modal-context";
+import { ModalProps, SearchModes } from "./modal-context";
+import { TrieveSDK } from "trieve-ts-sdk";
 
 export const setClickTriggers = (
   setOpen: (open: boolean) => void,
@@ -27,7 +28,11 @@ export const setClickTriggers = (
     }
 
     if (element) {
-      const { trieveSDK } = useModalState();
+      const trieveSDK = new TrieveSDK({
+        apiKey: props.apiKey,
+        datasetId: props.datasetId,
+      });
+
       trieveSDK.sendAnalyticsEvent({
         event_name: `${props.componentName}_click`,
         event_type: "click",
