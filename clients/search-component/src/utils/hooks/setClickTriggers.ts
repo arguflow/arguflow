@@ -28,21 +28,18 @@ export const setClickTriggers = (
     }
 
     if (element) {
-      const trieveSDK = new TrieveSDK({
-        apiKey: props.apiKey,
-        datasetId: props.datasetId,
-      });
-
-      trieveSDK.sendAnalyticsEvent({
-        event_name: `${props.componentName}_click`,
-        event_type: "click",
-        clicked_items: {
-          chunk_id: `${props.componentName}`,
-          position: 0,
-        },
-      });
-
       element.addEventListener("click", () => {
+        const trieveSDK = new TrieveSDK({
+          apiKey: props.apiKey,
+          datasetId: props.datasetId,
+          baseUrl: props.baseUrl,
+        });
+
+        trieveSDK.sendAnalyticsEvent({
+          event_name: `${props.componentName}_click`,
+          event_type: "click",
+        });
+
         startTransition(() => {
           setMode(trigger.mode);
           setOpen(true);

@@ -1367,7 +1367,7 @@ export type EventTypes = {
      */
     user_id?: (string) | null;
 } | {
-    clicked_items: ChunkWithPosition;
+    clicked_items?: ((ChunkWithPosition) | null);
     /**
      * The name of the event
      */

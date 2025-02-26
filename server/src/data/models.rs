@@ -7187,7 +7187,7 @@ pub enum EventTypes {
         /// The request id of the event to associate it with a request
         request: Option<RequestInfo>,
         /// The items that were clicked and their positons in a hashmap ie. {item_id: position}
-        clicked_items: ChunkWithPosition,
+        clicked_items: Option<ChunkWithPosition>,
         /// The user id of the user who clicked the items
         user_id: Option<String>,
         /// Whether the event is a conversion event
@@ -7300,10 +7300,10 @@ impl From<CTRDataRequestBody> for EventTypes {
                 request_type: data.ctr_type,
                 request_id: data.request_id,
             }),
-            clicked_items: ChunkWithPosition {
+            clicked_items: Some(ChunkWithPosition {
                 chunk_id: data.clicked_chunk_id.unwrap_or_default(),
                 position: data.position,
-            },
+            }),
             user_id: None,
             is_conversion: None,
         }

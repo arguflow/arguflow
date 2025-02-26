@@ -10740,12 +10740,16 @@
             "title": "Click",
             "required": [
               "event_name",
-              "clicked_items",
               "event_type"
             ],
             "properties": {
               "clicked_items": {
-                "$ref": "#/components/schemas/ChunkWithPosition"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ChunkWithPosition"
+                  }
+                ],
+                "nullable": true
               },
               "event_name": {
                 "type": "string",

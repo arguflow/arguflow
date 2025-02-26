@@ -289,7 +289,6 @@ function ChatProvider({ children }: { children: React.ReactNode }) {
     }
 
     let stoppedGeneratingMessage = false;
-    const { props: modalProps } = useModalState();
 
     if (!curGroup && (props.tags?.length ?? 0) > 0) {
       let filterParamsRetries = 0;
@@ -451,7 +450,7 @@ function ChatProvider({ children }: { children: React.ReactNode }) {
               completion_first: false,
             },
             concat_user_messages_query: true,
-            user_id: `${modalProps.componentName}`,
+            user_id: `${props.componentName}`,
             page_size: props.searchOptions?.page_size ?? 8,
             score_threshold: props.searchOptions?.score_threshold || null,
             use_group_search: props.useGroupSearch,
@@ -642,7 +641,6 @@ function ChatProvider({ children }: { children: React.ReactNode }) {
     isPositive: boolean,
     queryId: string | null,
   ) => {
-    const { props } = useModalState();
     if (queryId) {
       trieveSDK.rateRagQuery({
         rating: isPositive ? 1 : 0,
