@@ -31,6 +31,11 @@ async fn main() -> Result<(), ServiceError> {
         .parse::<u64>()
         .unwrap_or(200);
 
+    let qdrant_batch_size = std::env::var("QDRANT_BATCH_SIZE")
+        .unwrap_or("500".to_string())
+        .parse::<u32>()
+        .unwrap_or(500);
+
     let mut offset = Some(std::env::var("OFFSET_ID").unwrap_or(uuid::Uuid::nil().to_string()));
 
     while let Some(cur_offset) = offset {
@@ -57,7 +62,7 @@ async fn main() -> Result<(), ServiceError> {
         let (origin_qdrant_points, new_offset) = scroll_qdrant_collection_ids_custom_url(
             collection_to_clone.clone(),
             Some(cur_offset.to_string()),
-            Some(500),
+            Some(qdrant_batch_size),
             original_qdrant_connection,
         )
         .await

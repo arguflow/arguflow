@@ -19,21 +19,35 @@ export const InlineChatHeader = ({
     return null;
   }
   return (
-    <div className="tv-flex tv-bg-zinc-200 tv-justify-between -tv-mx-4 tv-px-4 tv-py-4 tv-rounded-t-lg tv-border-b-2">
-      <p className="tv-inline-message">{props.inlineHeader}</p>
-      <button
-        onClick={() => {
-          if (isDoneReading) {
-            resetHeight();
-            clearConversation();
-          } else {
-            stopGeneratingMessage();
-          }
-        }}
-        className="clear-button tv-px-2 tv-py-1 tv-rounded-md tv-text-white tv-text-sm tv-bg-[--tv-prop-brand-color]"
+    <div
+      className={`tv-text-xs tv-rounded-md !tv-bg-transparent tv-flex !hover:bg-tv-zinc-200 tv-px-2 tv-justify-end tv-items-center tv-p-2 tv-gap-0.5 tv-cursor-pointer ${props.type}`}
+      onClick={() => {
+        if (isDoneReading) {
+          resetHeight();
+          clearConversation();
+        } else {
+          stopGeneratingMessage();
+        }
+      }}
+      style={{ display: props.inline && messages.length ? "flex" : "none" }}
+    >
+      <svg
+        className="close-icon"
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       >
-        {isDoneReading ? "Clear" : "Stop"}
-      </button>
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <line x1="18" y1="6" x2="6" y2="18" />
+        <line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+      <span>{isDoneReading ? "Clear" : "Stop"} </span>
     </div>
   );
 };

@@ -1,21 +1,24 @@
+use crate::operators::chunk_operator::get_random_chunk_metadatas_query;
+use crate::operators::message_operator::models::DatasetAndOrgWithSubAndPlan;
+use itertools::Itertools;
+use simple_server_timing_header::Timer;
+use simsearch::SimSearch;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[cfg(not(feature = "hallucination-detection"))]
 use crate::data::models::DummyHallucinationScore;
 use crate::data::models::{
-    self, escape_quotes, ChunkMetadata, ChunkMetadataStringTagSet,
-    ChunkMetadataStringTagSetWithHighlightsScore, Dataset, DatasetConfiguration, LLMOptions,
-    MultiQuery, QueryTypes, RagQueryEventClickhouse, RedisPool, ScoreChunk, SearchMethod,
-    SearchModalities,
+    self, escape_quotes, ChunkMetadata, ChunkMetadataStringTagSet, ChunkMetadataStringTagSetWithHighlightsScore, ChunkMetadataTypes, Dataset, DatasetConfiguration, LLMOptions, MultiQuery, QdrantChunkMetadata, QueryTypes, RagQueryEventClickhouse, RedisPool, ScoreChunk, SearchMethod, SearchModalities, SuggestType
 };
 use crate::diesel::prelude::*;
 use crate::get_env;
 use crate::handlers::chunk_handler::SearchChunksReqPayload;
 use crate::handlers::group_handler::SearchOverGroupsReqPayload;
-use crate::handlers::message_handler::CreateMessageReqPayload;
+use crate::handlers::message_handler::{CreateMessageReqPayload, SuggestedQueriesReqPayload};
 use crate::operators::clickhouse_operator::ClickHouseEvent;
 use crate::operators::parse_operator::convert_html_to_text;
+use crate::operators::qdrant_operator::scroll_dataset_points;
 use crate::{
     data::models::{Message, Pool, SearchQueryEventClickhouse},
     errors::ServiceError,
@@ -32,8 +35,8 @@ use hallucination_detection::{HallucinationDetector, HallucinationScore};
 use openai_dive::v1::models::WhisperEngine;
 use openai_dive::v1::resources::audio::{AudioOutputFormat, AudioTranscriptionParametersBuilder};
 use openai_dive::v1::resources::chat::{
-    ChatMessageContentPart, ChatMessageImageContentPart, ChatMessageTextContentPart,
-    DeltaChatMessage, ImageUrlType,
+    ChatCompletionChoice, ChatMessageContentPart, ChatMessageImageContentPart,
+    ChatMessageTextContentPart, DeltaChatMessage, ImageUrlType,
 };
 use openai_dive::v1::resources::shared::{FileUpload, FileUploadBytes};
 use openai_dive::v1::{
@@ -45,14 +48,14 @@ use openai_dive::v1::{
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use simple_server_timing_header::Timer;
 use ureq::json;
 
+use super::chunk_operator::get_chunk_metadatas_from_point_ids;
 use super::clickhouse_operator::{get_latency_from_header, EventQueue};
 use super::parse_operator::parse_streaming_completetion;
 use super::search_operator::{
-    hybrid_search_over_groups, search_chunks_query, search_hybrid_chunks, search_over_groups_query,
-    ParsedQuery, ParsedQueryTypes,
+    assemble_qdrant_filter, hybrid_search_over_groups, search_chunks_query, search_hybrid_chunks,
+    search_over_groups_query, ParsedQuery, ParsedQueryTypes,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1338,7 +1341,6 @@ pub async fn stream_response(
                                                 }
                                             }
                                         }
-                                        log::info!("Returning {:?}", text.clone());
                                         text.clone()
                                     } else if !completion_first && !started_parsing_completion.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |_| Some(true)).unwrap_or(true) {
                                         let returned_chunks = score_chunks.iter().map(|score_chunk| {
@@ -1629,4 +1631,440 @@ pub async fn get_text_from_audio(audio_base64: &str) -> Result<String, ServiceEr
     dbg!(&text);
 
     Ok(text.replace("\n", ""))
+}
+
+pub async fn suggested_followp_questions(
+    payload: SuggestedQueriesReqPayload,
+    dataset_config: DatasetConfiguration,
+) -> Result<Vec<String>, ServiceError> {
+    let base_url = dataset_config.LLM_BASE_URL.clone();
+    let default_model = dataset_config.LLM_DEFAULT_MODEL.clone();
+
+    let base_url = if base_url.is_empty() {
+        "https://api.openai.com/api/v1".into()
+    } else {
+        base_url
+    };
+
+    let llm_api_key = if !dataset_config.LLM_API_KEY.is_empty() {
+        dataset_config.LLM_API_KEY.clone()
+    } else if base_url.contains("openai.com") {
+        get_env!("OPENAI_API_KEY", "OPENAI_API_KEY for openai should be set").into()
+    } else {
+        get_env!(
+            "LLM_API_KEY",
+            "LLM_API_KEY for openrouter or self-hosted should be set"
+        )
+        .into()
+    };
+
+    let followup = if payload.is_followup.unwrap_or(false) {
+        " followup"
+    } else {
+        ""
+    };
+
+    let number_of_suggestions_to_create = payload.suggestions_to_create.unwrap_or(10);
+    let context = payload
+        .context
+        .clone()
+        .unwrap_or("You are an AI assistant that wants to help the user".to_string());
+
+    let content = ChatMessageContent::Text(format!("Generate {number_of_suggestions_to_create}{followup} varied questions followed by a new line. Your only response should be the {number_of_suggestions_to_create}{followup} questions. \n\n Suggest varied questions with the following context in mind: {context}. Keep your query recommendations short, limited to 3-6 words. This should not be a list, so do not number each question."));
+
+    let message = ChatMessage::User {
+        content,
+        name: None,
+    };
+
+    let parameters = ChatCompletionParameters {
+        model: default_model,
+        messages: vec![message],
+        stream: Some(false),
+        temperature: None,
+        top_p: None,
+        n: None,
+        stop: None,
+        max_completion_tokens: None,
+        presence_penalty: Some(0.8),
+        frequency_penalty: Some(0.8),
+        logit_bias: None,
+        user: None,
+        response_format: None,
+        tools: None,
+        tool_choice: None,
+        logprobs: None,
+        top_logprobs: None,
+        seed: None,
+        ..Default::default()
+    };
+
+    let client = Client {
+        headers: None,
+        project: None,
+        api_key: llm_api_key,
+        http_client: reqwest::Client::new(),
+        base_url,
+        organization: None,
+    };
+
+    let query = client
+        .chat()
+        .create(parameters.clone())
+        .await
+        .map_err(|err| ServiceError::BadRequest(err.to_string()))?;
+
+    let queries: Vec<String> = match &query
+        .choices
+        .get(0)
+        .unwrap_or(&ChatCompletionChoice {
+            logprobs: None,
+            index: 0,
+            message: ChatMessage::User {
+                content: ChatMessageContent::Text("".to_string()),
+                name: None,
+            },
+            finish_reason: None,
+        })
+        .message
+    {
+        ChatMessage::User {
+            content: ChatMessageContent::Text(content),
+            ..
+        }
+        | ChatMessage::System {
+            content: ChatMessageContent::Text(content),
+            ..
+        }
+        | ChatMessage::Assistant {
+            content: Some(ChatMessageContent::Text(content)),
+            ..
+        } => content.clone(),
+        _ => "".to_string(),
+    }
+    .split('\n')
+    .filter_map(|query| {
+        let cleaned_query = query.to_string().trim().trim_matches('\n').to_string();
+        if cleaned_query.is_empty() {
+            None
+        } else {
+            Some(cleaned_query)
+        }
+    })
+    .map(|query| query.to_string().trim().trim_matches('\n').to_string())
+    .collect();
+
+    Ok(queries)
+}
+
+pub async fn suggested_new_queries(
+    payload: SuggestedQueriesReqPayload,
+    dataset_org_plan_sub: DatasetAndOrgWithSubAndPlan,
+    pool: web::Data<Pool>,
+    redis_pool: web::Data<RedisPool>,
+) -> Result<Vec<String>, ServiceError> {
+    let dataset_id = dataset_org_plan_sub.dataset.id;
+    let dataset_config =
+        DatasetConfiguration::from_json(dataset_org_plan_sub.dataset.clone().server_configuration);
+
+    let base_url = dataset_config.LLM_BASE_URL.clone();
+    let default_model = dataset_config.LLM_DEFAULT_MODEL.clone();
+    let qdrant_only = dataset_config.QDRANT_ONLY;
+
+    let base_url = if base_url.is_empty() {
+        "https://api.openai.com/api/v1".into()
+    } else {
+        base_url
+    };
+
+    let llm_api_key = if !dataset_config.LLM_API_KEY.is_empty() {
+        dataset_config.LLM_API_KEY.clone()
+    } else if base_url.contains("openai.com") {
+        get_env!("OPENAI_API_KEY", "OPENAI_API_KEY for openai should be set").into()
+    } else {
+        get_env!(
+            "LLM_API_KEY",
+            "LLM_API_KEY for openrouter or self-hosted should be set"
+        )
+        .into()
+    };
+    let search_type = payload.search_type.clone().unwrap_or(SearchMethod::Hybrid);
+    let filters = payload.filters.clone();
+
+    let chunk_metadatas = match payload.query.clone() {
+        Some(query) => {
+            let search_req_payload = SearchChunksReqPayload {
+                search_type: search_type.clone(),
+                query: models::QueryTypes::Single(models::SearchModalities::Text(query.clone())),
+                page_size: Some(10),
+                filters,
+                ..Default::default()
+            };
+            let parsed_query = ParsedQuery {
+                query,
+                quote_words: None,
+                negated_words: None,
+            };
+            match search_type {
+                SearchMethod::Hybrid => search_hybrid_chunks(
+                    search_req_payload,
+                    parsed_query,
+                    pool,
+                    redis_pool,
+                    dataset_org_plan_sub.dataset.clone(),
+                    &dataset_config,
+                    &mut Timer::new(),
+                )
+                .await
+                .map_err(|err| ServiceError::BadRequest(err.to_string()))?,
+                _ => search_chunks_query(
+                    search_req_payload,
+                    ParsedQueryTypes::Single(parsed_query),
+                    pool,
+                    redis_pool,
+                    dataset_org_plan_sub.dataset.clone(),
+                    &dataset_config,
+                    &mut Timer::new(),
+                )
+                .await
+                .map_err(|err| ServiceError::BadRequest(err.to_string()))?,
+            }
+            .score_chunks
+            .into_iter()
+            .filter_map(|chunk| chunk.metadata.clone().get(0).cloned())
+            .map(ChunkMetadata::from)
+            .collect::<Vec<ChunkMetadata>>()
+        }
+        None => {
+            let random_chunk = get_random_chunk_metadatas_query(dataset_id, 1, pool.clone())
+                .await?
+                .clone()
+                .get(0)
+                .cloned();
+            match random_chunk {
+                Some(chunk) => {
+                    let filter =
+                        assemble_qdrant_filter(filters, None, None, dataset_id, pool.clone())
+                            .await?;
+
+                    let (search_results, _) = scroll_dataset_points(
+                        10,
+                        Some(chunk.qdrant_point_id),
+                        None,
+                        dataset_config,
+                        filter,
+                    )
+                    .await?;
+                    if qdrant_only {
+                        search_results
+                            .iter()
+                            .map(|search_result| {
+                                ChunkMetadata::from(ChunkMetadataTypes::Metadata(
+                                    ChunkMetadataStringTagSet::from(QdrantChunkMetadata::from(
+                                        search_result.clone(),
+                                    )),
+                                ))
+                            })
+                            .collect()
+                    } else {
+                        let qdrant_point_ids: Vec<uuid::Uuid> = search_results
+                            .iter()
+                            .map(|search_result| search_result.point_id)
+                            .collect();
+                        get_chunk_metadatas_from_point_ids(qdrant_point_ids.clone(), pool)
+                            .await?
+                            .into_iter()
+                            .map(ChunkMetadata::from)
+                            .collect()
+                    }
+                }
+                None => vec![],
+            }
+        }
+    };
+
+    let rag_content = chunk_metadatas
+        .iter()
+        .enumerate()
+        .map(|(idx, chunk)| {
+            format!(
+                "Doc {}: {}",
+                idx + 1,
+                convert_html_to_text(&(chunk.chunk_html.clone().unwrap_or_default()))
+            )
+        })
+        .collect::<Vec<String>>()
+        .join("\n\n");
+
+    let query_style = match payload
+        .suggestion_type
+        .clone()
+        .unwrap_or(SuggestType::Keyword)
+    {
+        SuggestType::Question => "question",
+        SuggestType::Keyword => "keyword",
+        SuggestType::Semantic => "semantic while not question",
+    };
+    let context_sentence = match payload.context.clone() {
+        Some(context) => {
+            format!(
+                "\n\nSuggest varied {query_style} queries with the following context in mind: {}.\n\n",
+                context
+            )
+        }
+        None => "".to_string(),
+    };
+
+    let number_of_suggestions_to_create = payload.suggestions_to_create.unwrap_or(10);
+
+    let content = ChatMessageContent::Text(format!(
+        "Here is some content which the user might be looking for: {rag_content}{context_sentence}. Generate {number_of_suggestions_to_create} varied followup {query_style} style queries based off the domain of this dataset. Your only response should be the {number_of_suggestions_to_create} followup {query_style} style queries which are separated by new lines and are just text and you do not add any other context or information about the followup {query_style} style queries. This should not be a list, so do not number each {query_style} style queries.",
+    ));
+
+    let message = ChatMessage::User {
+        content,
+        name: None,
+    };
+
+    let parameters = ChatCompletionParameters {
+        model: default_model,
+        messages: vec![message],
+        stream: Some(false),
+        temperature: None,
+        top_p: None,
+        n: None,
+        stop: None,
+        max_completion_tokens: None,
+        presence_penalty: Some(0.8),
+        frequency_penalty: Some(0.8),
+        logit_bias: None,
+        user: None,
+        response_format: None,
+        tools: None,
+        tool_choice: None,
+        logprobs: None,
+        top_logprobs: None,
+        seed: None,
+        ..Default::default()
+    };
+
+    let client = Client {
+        headers: None,
+        project: None,
+        api_key: llm_api_key,
+        http_client: reqwest::Client::new(),
+        base_url,
+        organization: None,
+    };
+
+    let mut query = client
+        .chat()
+        .create(parameters.clone())
+        .await
+        .map_err(|err| ServiceError::BadRequest(err.to_string()))?;
+
+    let mut queries: Vec<String> = match &query
+        .choices
+        .get(0)
+        .unwrap_or(&ChatCompletionChoice {
+            logprobs: None,
+            index: 0,
+            message: ChatMessage::User {
+                content: ChatMessageContent::Text("".to_string()),
+                name: None,
+            },
+            finish_reason: None,
+        })
+        .message
+    {
+        ChatMessage::User {
+            content: ChatMessageContent::Text(content),
+            ..
+        }
+        | ChatMessage::System {
+            content: ChatMessageContent::Text(content),
+            ..
+        }
+        | ChatMessage::Assistant {
+            content: Some(ChatMessageContent::Text(content)),
+            ..
+        } => content.clone(),
+        _ => "".to_string(),
+    }
+    .split('\n')
+    .filter_map(|query| {
+        let cleaned_query = query.to_string().trim().trim_matches('\n').to_string();
+        if cleaned_query.is_empty() {
+            None
+        } else {
+            Some(cleaned_query)
+        }
+    })
+    .map(|query| query.to_string().trim().trim_matches('\n').to_string())
+    .collect();
+
+    while queries.len() < number_of_suggestions_to_create {
+        query = match client.chat().create(parameters.clone()).await {
+            Ok(query) => query,
+            Err(err) => {
+                log::error!(
+                    "Error generating suggested queries when queries are less than 3: {}",
+                    err
+                );
+                return Err(ServiceError::BadRequest(err.to_string()));
+            }
+        };
+        let first_query = match query.choices.get(0) {
+            Some(first_query) => first_query,
+            None => {
+                log::error!("Error generating suggested queries when queries are less than 3: No first query in choices");
+                return Err(ServiceError::BadRequest(
+                    "No first query in choices on call to LLM".to_string(),
+                ));
+            }
+        };
+        queries = match &first_query.message {
+            ChatMessage::User {
+                content: ChatMessageContent::Text(content),
+                ..
+            }
+            | ChatMessage::System {
+                content: ChatMessageContent::Text(content),
+                ..
+            }
+            | ChatMessage::Assistant {
+                content: Some(ChatMessageContent::Text(content)),
+                ..
+            } => content.clone(),
+            _ => "".to_string(),
+        }
+        .split('\n')
+        .map(|query| query.to_string().trim().trim_matches('\n').to_string())
+        .collect();
+    }
+
+    let mut engine: SimSearch<String> = SimSearch::new();
+
+    chunk_metadatas.iter().for_each(|chunk| {
+        let content = convert_html_to_text(&chunk.chunk_html.clone().unwrap_or_default());
+
+        engine.insert(content.clone(), &content);
+    });
+
+    let sortable_queries = queries
+        .iter()
+        .map(|query| (query, engine.search(query).len()))
+        .collect_vec();
+
+    //search for the query
+    queries = sortable_queries
+        .iter()
+        .sorted_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+        .map(|(content, _length)| content)
+        .take(number_of_suggestions_to_create)
+        .cloned()
+        .cloned()
+        .collect_vec();
+
+    Ok(queries)
 }

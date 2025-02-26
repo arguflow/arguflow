@@ -864,7 +864,7 @@ pub async fn process_crawl_doc(
     let chunks_to_upload = chunks.chunks(120);
     for batch in chunks_to_upload {
         let (chunk_ingestion_message, chunk_metadatas) =
-            create_chunk_metadata(batch.to_vec(), dataset_id).await?;
+            create_chunk_metadata(batch.to_vec(), dataset_id)?;
 
         if !chunk_metadatas.is_empty() {
             broccoli_queue

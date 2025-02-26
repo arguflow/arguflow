@@ -932,3 +932,53 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  backfill-qdrant-from-pg:
+    name: Push Backfill Qdrant script
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: blacksmith-8vcpu-ubuntu-2204
+            platform: linux/amd64
+            tag: latest
+          # - runner: blacksmith-8vcpu-ubuntu-2204
+          #   platform: linux/arm64
+          #   tag: latest-arm
+          #   suffix: -arm
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v4
+
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v3
+
+      - name: Setup buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # list of Docker images to use as base name for tags
+          images: |
+            trieve/backfill-qdrant
+          tags: |
+            type=raw,${{matrix.tag}}
+            type=sha,suffix=${{matrix.suffix}}
+
+      - name: Build and push Docker image
+        uses: useblacksmith/build-push-action@v1.0.0-beta
+        with:
+          platforms: ${{ matrix.platform }}
+          context: server/
+          file: ./server/Dockerfile.backfill-qdrant-from-pg
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

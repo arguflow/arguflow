@@ -12,26 +12,26 @@ export const FollowupQueries = () => {
 
   const [parent] = useAutoAnimate();
 
+  if (!isDoneReading) {
+    return null;
+  }
+
   return (
-    <div ref={parent}>
-      {isDoneReading && (
-        <div ref={parent} className="followup-questions">
-          {suggestedQuestions?.map((q) => (
-            <button
-              onClick={() => {
-                askQuestion(q);
-              }}
-              key={q}
-              className={`followup-question ${
-                isLoadingSuggestedQueries ? "loading" : ""
-              }`}
-            >
-              <SparklesIcon className="followup-icon" />
-              {q}
-            </button>
-          ))}
-        </div>
-      )}
+    <div ref={parent} className="followup-questions">
+      {suggestedQuestions?.map((q) => (
+        <button
+          onClick={() => {
+            askQuestion(q);
+          }}
+          key={q}
+          className={`followup-question ${
+            isLoadingSuggestedQueries ? "loading" : ""
+          }`}
+        >
+          <SparklesIcon className="followup-icon" />
+          {q}
+        </button>
+      ))}
     </div>
   );
 };

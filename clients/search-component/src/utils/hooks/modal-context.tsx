@@ -111,15 +111,12 @@ export type ModalProps = {
   inline: boolean;
   inlineCarousel: boolean;
   zIndex?: number;
-  modalPosition?:
-  | "center"
-  | "right";
   showFloatingButton?: boolean;
   floatingButtonPosition?:
-  | "top-left"
-  | "top-right"
-  | "bottom-left"
-  | "bottom-right";
+    | "top-left"
+    | "top-right"
+    | "bottom-left"
+    | "bottom-right";
   floatingSearchIconPosition?: "left" | "right";
   showFloatingSearchIcon?: boolean;
   disableFloatingSearchIconClick?: boolean;
@@ -135,6 +132,10 @@ export type ModalProps = {
   showResultHighlights?: boolean;
   initialAiMessage?: string;
   ignoreEventListeners?: boolean;
+  hideOverlay?: boolean;
+  hidePrice?: boolean;
+  hideChunkHtml?: boolean;
+  componentName?: string;
 };
 
 const defaultProps = {
@@ -168,9 +169,6 @@ const defaultProps = {
   responsive: false,
   zIndex: 1000,
   debounceMs: 0,
-  modalPosition: "center" as
-    | "center"
-    | "right",
   showFloatingButton: false,
   floatingButtonPosition: "bottom-right" as
     | "top-left"
@@ -193,6 +191,10 @@ const defaultProps = {
   showResultHighlights: true,
   initialAiMessage: undefined,
   ignoreEventListeners: false,
+  hideOverlay: false,
+  hidePrice: false,
+  hideChunkHtml: false,
+  componentName: "Trieve Search Component",
 } satisfies ModalProps;
 
 const ModalContext = createContext<{

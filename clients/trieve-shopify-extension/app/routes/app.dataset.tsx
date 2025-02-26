@@ -5,7 +5,7 @@ import { initTrieveSdk, validateTrieveAuth } from "app/auth";
 import {
   defaultCrawlOptions,
   DatasetSettings as DatasetSettings,
-  ExtendedCrawlOptions
+  ExtendedCrawlOptions,
 } from "app/components/CrawlSettings";
 import { sendChunks } from "app/processors/getProducts";
 import { authenticate } from "app/shopify.server";
@@ -20,7 +20,9 @@ export const loader = async (args: LoaderFunctionArgs) => {
     });
   }
 
-  const datasets = await trieve.getDatasetsFromOrganization(trieve.organizationId);
+  const datasets = await trieve.getDatasetsFromOrganization(
+    trieve.organizationId,
+  );
   let datasetId = trieve.datasetId;
   if (!datasetId && trieve.organizationId) {
     datasetId = datasets[0].dataset.id;
@@ -38,9 +40,9 @@ export const loader = async (args: LoaderFunctionArgs) => {
   }
 
   trieve.datasetId = datasetUsage?.dataset.id;
-  const scrapingOptions = await trieve.trieve.fetch("/api/crawl", "get", {
-    datasetId: datasetId
-  }) as unknown as CrawlRequest[];
+  const scrapingOptions = (await trieve.trieve.fetch("/api/crawl", "get", {
+    datasetId: datasetId,
+  })) as unknown as CrawlRequest[];
 
   return {
     datasets: datasets,
@@ -60,12 +62,15 @@ export const action = async (data: LoaderFunctionArgs) => {
     ) as ExtendedCrawlOptions) ?? defaultCrawlOptions;
   const datasetId = formData.get("dataset_id") as string;
 
-  await sendChunks(datasetId ?? "", trieveKey, admin, session, crawlOptions);
+  sendChunks(datasetId ?? "", trieveKey, admin, session, crawlOptions).catch(
+    console.error,
+  );
   return null;
 };
 
 export default function Dataset() {
-  const { currentDatasetUsage, crawlOptions, datasets } = useLoaderData<typeof loader>();
+  const { currentDatasetUsage, crawlOptions, datasets } =
+    useLoaderData<typeof loader>();
 
   return (
     <Page>
@@ -79,7 +84,9 @@ export default function Dataset() {
       </Text>
       <Box paddingBlockStart="400">
         <DatasetSettings
-          initalCrawlOptions={crawlOptions?.crawl_options || defaultCrawlOptions}
+          initalCrawlOptions={
+            crawlOptions?.crawl_options || defaultCrawlOptions
+          }
           datasets={datasets}
           currentDatasetUsage={currentDatasetUsage}
         />

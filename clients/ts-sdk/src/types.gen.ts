@@ -962,11 +962,33 @@ export type Dataset = {
 };
 
 export type DatasetAnalytics = {
+    /**
+     * Average latency of search queries
+     */
     avg_latency: number;
+    /**
+     * 50th percentile latency of search queries
+     */
     p50: number;
+    /**
+     * 95th percentile latency of search queries
+     */
     p95: number;
+    /**
+     * 99th percentile latency of search queries
+     */
     p99: number;
-    search_rps: number;
+    /**
+     * Total number of searches with a negative rating
+     */
+    total_negative_ratings: number;
+    /**
+     * Total number of searches with a positive rating
+     */
+    total_positive_ratings: number;
+    /**
+     * Total number of search queries
+     */
     total_queries: number;
 };
 
@@ -1345,7 +1367,7 @@ export type EventTypes = {
      */
     user_id?: (string) | null;
 } | {
-    clicked_items: ChunkWithPosition;
+    clicked_items?: ((ChunkWithPosition) | null);
     /**
      * The name of the event
      */
@@ -2359,6 +2381,9 @@ export type RAGAnalytics = {
 } | {
     request_id: string;
     type: 'rag_query_details';
+} | {
+    filter?: ((RAGAnalyticsFilter) | null);
+    type: 'rag_query_ratings';
 };
 
 export type type3 = 'rag_queries';
@@ -2368,7 +2393,7 @@ export type RAGAnalyticsFilter = {
     rag_type?: ((RagTypes) | null);
 };
 
-export type RAGAnalyticsResponse = RagQueryResponse | RAGUsageResponse | RAGUsageGraphResponse | RagQueryEvent;
+export type RAGAnalyticsResponse = RagQueryResponse | RAGUsageResponse | RAGUsageGraphResponse | RagQueryEvent | RagQueryRatingsResponse;
 
 export type RAGSortBy = 'hallucination_score' | 'top_score' | 'created_at' | 'latency';
 
@@ -2396,6 +2421,17 @@ export type RagQueryEvent = {
     user_message: string;
 };
 
+export type RagQueryRatingsResponse = {
+    /**
+     * Total number of negative RAG ratings
+     */
+    total_negative_ratings: number;
+    /**
+     * Total number of positive RAG ratings
+     */
+    total_positive_ratings: number;
+};
+
 export type RagQueryResponse = {
     queries: Array<RagQueryEvent>;
 };
@@ -2412,6 +2448,7 @@ export type Range = {
 export type RangeCondition = number;
 
 export type RateQueryRequest = {
+    metadata?: unknown;
     note?: (string) | null;
     query_id: string;
     rating: number;
@@ -2928,6 +2965,7 @@ export type SearchQueryEvent = {
 };
 
 export type SearchQueryRating = {
+    metadata?: unknown;
     note?: (string) | null;
     rating: number;
 };
@@ -3210,6 +3248,7 @@ export type SuggestedQueriesReqPayload = {
      */
     context?: (string) | null;
     filters?: ((ChunkFilter) | null);
+    is_followup?: (boolean) | null;
     /**
      * The query to base the generated suggested queries off of using RAG. A hybrid search for 10 chunks from your dataset using this query will be performed and the context of the chunks will be used to generate the suggested queries.
      */

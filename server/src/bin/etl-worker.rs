@@ -235,6 +235,7 @@ async fn webhook_response(
             convert_html_to_text: Some(true),
             fulltext_boost: fulltext_boost.clone(),
             semantic_boost: semantic_boost.clone(),
+            only_qdrant: Some(false),
         };
 
         broccoli_queue

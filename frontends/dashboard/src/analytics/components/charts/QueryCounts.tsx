@@ -18,7 +18,7 @@ const displaySearchType = (type: SearchTypeCount["search_type"]) => {
       return "Search Over Groups";
     case "search_within_groups":
       return "Search Within Groups";
-    case "rag":
+    case "rag_chunks":
       return "RAG";
     default:
       return type;
@@ -64,7 +64,7 @@ export const QueryCounts = () => {
                   No searches found for this time period.
                 </div>
               }
-              each={data()}
+              each={data().filter((d) => d.search_type !== "rag_chunks")}
             >
               {(search) => {
                 return (

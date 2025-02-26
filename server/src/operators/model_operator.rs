@@ -13,10 +13,9 @@ use std::{collections::HashMap, io::Cursor, ops::IndexMut, sync::Arc};
 
 use super::parse_operator::convert_html_to_text;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct EmbeddingParameters {
-    /// Input text to embed, encoded as a string or array of tokens.
-    /// To embed multiple inputs in a single request, pass an array of strings or array of token arrays.
+    /// Input text to embed, encoded as a string or array of tokens. To embed multiple inputs in a single request, pass an array of strings or array of token arrays.
     pub input: EmbeddingInput,
     /// ID of the model to use.
     pub model: String,
@@ -109,72 +108,86 @@ pub async fn get_dense_vector(
     };
 
     web::block(move || {
-        let embeddings_resp_a = ureq::AgentBuilder::new()
-            .tls_connector(Arc::new(native_tls::TlsConnector::new().map_err(|_| {
-                ServiceError::InternalServerError("Failed to acquire tls connection".to_string())
-            })?))
-            .build()
-            .post(&format!(
-                "{}/embeddings?api-version=2023-05-15",
-                embedding_base_url
-            ))
-            .set("Authorization", &format!("Bearer {}", &embedding_api_key))
-            .set("api-key", &embedding_api_key)
-            .set("Content-Type", "application/json")
-            .send_json(serde_json::to_value(parameters).unwrap())
-            .map_err(|e| {
-                ServiceError::InternalServerError(format!(
-                    "Could not get embeddings from server: {:?}, {:?}",
-                    e,
-                    e.to_string()
+        let mut retries = 0;
+        let mut embedding_resp: Option<DenseEmbedData> = None;
+        let mut embedding_error = None;
+        while retries < 3 {
+            let embeddings_resp_a = ureq::AgentBuilder::new()
+                .tls_connector(Arc::new(native_tls::TlsConnector::new().map_err(|_| {
+                    ServiceError::InternalServerError(
+                        "Failed to acquire tls connection".to_string(),
+                    )
+                })?))
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .post(&format!(
+                    "{}/embeddings?api-version=2023-05-15",
+                    embedding_base_url
                 ))
-            })?;
+                .set("Authorization", &format!("Bearer {}", &embedding_api_key))
+                .set("api-key", &embedding_api_key)
+                .set("Content-Type", "application/json")
+                .send_json(serde_json::to_value(parameters.clone()).unwrap());
 
-        let embeddings_resp = embeddings_resp_a
-            .into_json::<DenseEmbedData>()
-            .map_err(|err| {
-                ServiceError::InternalServerError(format!(
-                    "Failed to format response from embeddings server {:?}",
-                    err
-                ))
-            })?;
-
-        let mut vectors = embeddings_resp.to_vec();
-        if let Some(semantic_boost) = semantic_boost {
-            let distance_factor = semantic_boost.distance_factor;
-            let boost_vector = match vectors.pop() {
-                Some(v) => v,
-                None => {
-                    return Err(ServiceError::InternalServerError(
-                        "No dense embedding returned from server for boost_vector".to_owned(),
-                    ))
+            if let Ok(embeddings_resp_a) = embeddings_resp_a {
+                let response_data = embeddings_resp_a.into_json::<DenseEmbedData>();
+                if let Ok(embeddings_resp) = response_data {
+                    embedding_resp = Some(embeddings_resp);
+                    break;
+                } else {
+                    retries += 1;
                 }
-            };
-            let embedding_vector = match vectors.pop() {
-                Some(v) => v,
-                None => {
-                    return Err(ServiceError::InternalServerError(
-                        "No dense embedding returned from server for embedding_vector".to_owned(),
-                    ))
-                }
-            };
-
-            return Ok(embedding_vector
-                .iter()
-                .zip(boost_vector)
-                .map(|(vec_elem, boost_vec_elem)| vec_elem + distance_factor * boost_vec_elem)
-                .collect());
+            } else {
+                embedding_error = Some(embeddings_resp_a);
+                retries += 1;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
         }
 
-        match vectors.first() {
-            Some(v) => Ok(v.clone()),
-            None => Err(ServiceError::InternalServerError(
-                "No dense embeddings returned from server".to_owned(),
-            )),
+        if let Some(embeddings_resp) = embedding_resp {
+            let mut vectors = embeddings_resp.to_vec();
+            if let Some(semantic_boost) = semantic_boost {
+                let distance_factor = semantic_boost.distance_factor;
+                let boost_vector = match vectors.pop() {
+                    Some(v) => v,
+                    None => {
+                        return Err(ServiceError::InternalServerError(
+                            "No dense embedding returned from server for boost_vector".to_owned(),
+                        ))
+                    }
+                };
+                let embedding_vector = match vectors.pop() {
+                    Some(v) => v,
+                    None => {
+                        return Err(ServiceError::InternalServerError(
+                            "No dense embedding returned from server for embedding_vector"
+                                .to_owned(),
+                        ))
+                    }
+                };
+
+                return Ok(embedding_vector
+                    .iter()
+                    .zip(boost_vector)
+                    .map(|(vec_elem, boost_vec_elem)| vec_elem + distance_factor * boost_vec_elem)
+                    .collect());
+            }
+
+            match vectors.first() {
+                Some(v) => Ok(v.clone()),
+                None => Err(ServiceError::InternalServerError(
+                    "No dense embeddings returned from server".to_owned(),
+                )),
+            }
+        } else {
+            Err(ServiceError::InternalServerError(format!(
+                "Failed to get dense vector embedding {:?}",
+                embedding_error
+            )))
         }
     })
     .await
-    .map_err(|err| ServiceError::BadRequest(format!("Thread error {:?}", err)))?
+    .map_err(|err| ServiceError::BadRequest(format!("Error getting dense vector {:?}", err)))?
 }
 
 pub async fn get_sparse_vector(
@@ -213,95 +226,106 @@ pub async fn get_sparse_vector(
     let embed_type_string = embed_type.to_owned();
 
     web::block(move || {
-        let mut sparse_vectors = ureq::AgentBuilder::new()
-            .tls_connector(Arc::new(native_tls::TlsConnector::new().map_err(|_| {
-                ServiceError::InternalServerError("Failed to acquire tls connection".to_string())
-            })?))
-            .build()
-            .post(&embedding_server_call)
-            .set("Content-Type", "application/json")
-            .set(
-                "Authorization",
-                &format!(
-                    "Bearer {}",
-                    get_env!("OPENAI_API_KEY", "OPENAI_API should be set")
-                ),
-            )
-            .send_json(CustomSparseEmbedData {
-                inputs,
-                encode_type: embed_type_string,
-                truncate: true,
-            })
-            .map_err(|err| {
-                log::error!(
-                    "Failed parsing response from custom embedding server {:?}",
-                    err
-                );
-                ServiceError::BadRequest(format!("Failed making call to server {:?}", err))
-            })?
-            .into_json::<Vec<Vec<SpladeIndicies>>>()
-            .map_err(|_e| {
-                log::error!(
-                    "Failed parsing response from custom embedding server {:?}",
-                    _e
-                );
-                ServiceError::BadRequest(
-                    "Failed parsing response from custom embedding server".to_string(),
+        let mut retries = 0;
+        let mut sparse_vectors = None;
+        let mut sparse_error = None;
+        while retries < 3 {
+            let sparse_vectors_a = ureq::AgentBuilder::new()
+                .tls_connector(Arc::new(native_tls::TlsConnector::new().map_err(|_| {
+                    ServiceError::InternalServerError(
+                        "Failed to acquire tls connection".to_string(),
+                    )
+                })?))
+                .timeout(std::time::Duration::from_secs(5))
+                .build()
+                .post(&embedding_server_call)
+                .set("Content-Type", "application/json")
+                .set(
+                    "Authorization",
+                    &format!(
+                        "Bearer {}",
+                        get_env!("OPENAI_API_KEY", "OPENAI_API should be set")
+                    ),
                 )
-            })?;
+                .send_json(CustomSparseEmbedData {
+                    inputs: inputs.clone(),
+                    encode_type: embed_type_string.clone(),
+                    truncate: true,
+                });
 
-        if let Some(fulltext_boost) = fulltext_boost {
-            let boost_amt = fulltext_boost.boost_factor;
-            let boost_vector = match sparse_vectors.pop() {
-                Some(v) => v,
-                None => {
-                    return Err(ServiceError::InternalServerError(
-                        "No sparse vector returned from server for boost_vector".to_owned(),
-                    ))
+            if let Ok(sparse_vectors_a) = sparse_vectors_a {
+                let response_data = sparse_vectors_a.into_json::<Vec<Vec<SpladeIndicies>>>();
+                if let Ok(sparse_vectors_b) = response_data {
+                    sparse_vectors = Some(sparse_vectors_b);
+                    break;
+                } else {
+                    retries += 1;
                 }
-            };
-            let query_vector = match sparse_vectors.pop() {
-                Some(v) => v,
-                None => {
-                    return Err(ServiceError::InternalServerError(
-                        "No sparse vector returned from server for embedding_vector".to_owned(),
-                    ))
-                }
-            };
-
-            let boosted_query_vector = query_vector
-                .iter()
-                .map(|splade_indice| {
-                    if boost_vector
-                        .iter()
-                        .any(|boost_splade_indice| boost_splade_indice.index == splade_indice.index)
-                    {
-                        SpladeIndicies {
-                            index: splade_indice.index,
-                            value: splade_indice.value * (boost_amt as f32),
-                        }
-                        .into_tuple()
-                    } else {
-                        SpladeIndicies {
-                            index: splade_indice.index,
-                            value: splade_indice.value,
-                        }
-                        .into_tuple()
-                    }
-                })
-                .collect();
-
-            return Ok(boosted_query_vector);
+            } else {
+                sparse_error = Some(sparse_vectors_a);
+                retries += 1;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(200));
         }
 
-        match sparse_vectors.first() {
-            Some(v) => Ok(v
-                .iter()
-                .map(|splade_idx| (*splade_idx).into_tuple())
-                .collect()),
-            None => Err(ServiceError::InternalServerError(
-                "No sparse embeddings returned from server".to_owned(),
-            )),
+        if let Some(mut sparse_vectors) = sparse_vectors {
+            if let Some(fulltext_boost) = fulltext_boost {
+                let boost_amt = fulltext_boost.boost_factor;
+                let boost_vector = match sparse_vectors.pop() {
+                    Some(v) => v,
+                    None => {
+                        return Err(ServiceError::InternalServerError(
+                            "No sparse vector returned from server for boost_vector".to_owned(),
+                        ))
+                    }
+                };
+                let query_vector = match sparse_vectors.pop() {
+                    Some(v) => v,
+                    None => {
+                        return Err(ServiceError::InternalServerError(
+                            "No sparse vector returned from server for embedding_vector".to_owned(),
+                        ))
+                    }
+                };
+
+                let boosted_query_vector = query_vector
+                    .iter()
+                    .map(|splade_indice| {
+                        if boost_vector.iter().any(|boost_splade_indice| {
+                            boost_splade_indice.index == splade_indice.index
+                        }) {
+                            SpladeIndicies {
+                                index: splade_indice.index,
+                                value: splade_indice.value * (boost_amt as f32),
+                            }
+                            .into_tuple()
+                        } else {
+                            SpladeIndicies {
+                                index: splade_indice.index,
+                                value: splade_indice.value,
+                            }
+                            .into_tuple()
+                        }
+                    })
+                    .collect();
+
+                return Ok(boosted_query_vector);
+            }
+
+            match sparse_vectors.first() {
+                Some(v) => Ok(v
+                    .iter()
+                    .map(|splade_idx| (*splade_idx).into_tuple())
+                    .collect()),
+                None => Err(ServiceError::InternalServerError(
+                    "No sparse embeddings returned from server".to_owned(),
+                )),
+            }
+        } else {
+            Err(ServiceError::InternalServerError(format!(
+                "Failed to get sparse vector embedding {:?}",
+                sparse_error
+            )))
         }
     })
     .await

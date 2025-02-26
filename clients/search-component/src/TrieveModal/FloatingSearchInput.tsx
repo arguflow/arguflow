@@ -17,6 +17,9 @@ export const FloatingSearchInput = () => {
         props.theme == "dark" ? " dark" : ""
       }`}
       onClick={handleOpenSearch}
+      style={{
+        zIndex: (props.zIndex ?? 1000) - 1,
+      }}
     >
       <div className="floating-search-icon">
         <svg

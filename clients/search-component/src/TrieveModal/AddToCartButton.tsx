@@ -39,15 +39,15 @@ export const AddToCartButton = ({ item }: Props) => {
         }
       }}
     >
-      {quantityInCart <= 0 ? (
-        <>
-          <ShoppingCart />
-          Add To Cart
-        </>
-      ) : (
+      {quantityInCart && quantityInCart > 0 ? (
         <>
           <CheckIcon />
           {quantityInCart} In Cart
+        </>
+      ) : (
+        <>
+          <ShoppingCart />
+          Add To Cart
         </>
       )}
     </div>

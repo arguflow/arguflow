@@ -199,7 +199,13 @@ body {
     }
 
     .additional-links {
+      @apply tv-mt-4 tv-flex tv-flex-wrap tv-gap-2;
+
       a.source-anchor {
+        @apply tv-px-2 tv-py-1 tv-rounded tv-text-sm;
+
+        background-color: var(--tv-zinc-100);
+
         &.yt-anchor {
           @apply tv-max-w-44 tv-text-center tv-pt-3;
         }
@@ -349,7 +355,7 @@ body {
     }
 
     .system {
-      @apply tv-mt-2 sm:tv-mt-2 tv-mb-2 tv-items-center tv-overflow-ellipsis tv-max-w-[100vw];
+      @apply tv-mt-2 sm:tv-mt-2 tv-mb-2 tv-items-center tv-overflow-ellipsis;
 
       p {
         @apply tv-pb-0.5;
@@ -392,8 +398,6 @@ body {
     }
 
     .system.ecommerce {
-      @apply tv-max-w-[100vw];
-
       hr {
         @apply tv-mb-4;
       }
@@ -570,7 +574,7 @@ body {
     }
 
     .questions {
-      @apply tv-text-sm tv-flex tv-flex-wrap tv-gap-2 tv-pb-12;
+      @apply tv-text-sm tv-flex tv-flex-wrap tv-gap-2 tv-pb-2;
 
       .suggested-question {
         @apply tv-p-2 tv-text-left tv-rounded-md tv-border tv-transition-all;
@@ -1176,9 +1180,24 @@ body {
   }
 
   .floating-action-button {
-    @apply tv-fixed tv-flex tv-flex-row tv-w-24 tv-h-10 tv-gap-2 tv-justify-center tv-items-center tv-text-sm tv-cursor-pointer tv-text-white tv-rounded-full tv-z-[999] tv-border-0;
-    background-color: var(--tv-prop-brand-color);
+    @apply tv-fixed tv-flex tv-flex-row tv-gap-2 tv-justify-center tv-items-center tv-cursor-pointer tv-rounded-full tv-border-0 tv-shadow-sm tv-bg-zinc-100 tv-px-4 tv-py-2.5;
     font-family: var(--tv-prop-brand-font-family);
+
+    &.dark {
+      @apply tv-bg-zinc-900 tv-text-white;
+
+      &:hover {
+        @apply tv-bg-zinc-800;
+      }
+    }
+
+    &:hover {
+      @apply tv-bg-zinc-200 tv-transform tv-transition-transform tv-duration-200 hover:tv-scale-110;
+    }
+
+    img {
+      @apply tv-h-6 tv-w-6;
+    }
   }
 
   .floating-search-icon {
@@ -1188,7 +1207,7 @@ body {
   }
 
   .floating-search-btn-container {
-    @apply tv-fixed tv-flex tv-flex-row tv-justify-center tv-items-center tv-top-[calc(50%-34px)] tv-bg-white tv-w-min tv-z-[999] tv-p-2 hover:tv-cursor-pointer;
+    @apply tv-fixed tv-flex tv-flex-row tv-justify-center tv-items-center tv-top-[calc(50%-34px)] tv-bg-white tv-w-min tv-p-2 hover:tv-cursor-pointer;
     box-shadow: 0 0 20px 10px rgba(0, 0, 0, 0.05);
 
     &.dark {
@@ -1207,7 +1226,7 @@ body {
   }
 
   .floating-input-container {
-    @apply tv-z-[999] tv-fixed tv-bottom-5 tv-flex tv-flex-row tv-items-center tv-justify-start tv-gap-2 tv-w-3/4 tv-left-[12.5%] sm:tv-left-[25%] sm:tv-w-1/2 tv-p-1 tv-pr-5 tv-h-[55px] tv-rounded-full tv-cursor-pointer tv-transition-colors tv-duration-300 tv-ease-in-out tv-bg-white tv-border-2;
+    @apply tv-fixed tv-bottom-5 tv-flex tv-flex-row tv-items-center tv-justify-start tv-gap-2 tv-w-3/4 tv-left-[12.5%] sm:tv-left-[25%] sm:tv-w-1/2 tv-p-1 tv-pr-5 tv-h-[55px] tv-rounded-full tv-cursor-pointer tv-transition-colors tv-duration-300 tv-ease-in-out tv-bg-white tv-border-2;
 
     &.dark {
       @apply tv-bg-zinc-900 tv-border-zinc-600;

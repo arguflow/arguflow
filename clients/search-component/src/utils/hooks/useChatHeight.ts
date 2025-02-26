@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 export const useChatHeight = (
   modalRef: React.RefObject<HTMLDivElement>,
-  absoluteMinimum: number = 0,
+  absoluteMinimum: number = 0
 ) => {
   const [chatHeight, setChatHeight] = useState(absoluteMinimum);
   const [minHeight, setMinHeight] = useState(absoluteMinimum);
@@ -27,7 +27,7 @@ export const useChatHeight = (
     }
   }, [chatHeight]);
 
-  const reset = () => {
+  const resetHeight = () => {
     setMinHeight(absoluteMinimum);
     setEnabled(false);
     setTimeout(() => {
@@ -35,5 +35,5 @@ export const useChatHeight = (
     }, 200);
   };
 
-  return { minHeight, resetHeight: reset };
+  return { minHeight, resetHeight };
 };

@@ -5,6 +5,7 @@ import { useModalState } from "../../utils/hooks/modal-context";
 import { cn } from "../../utils/styles";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { SparklesIcon } from "../icons";
+import { AIInitialMessage } from "./AIInitalMessage";
 
 export const SuggestedQuestions = () => {
   const { askQuestion, messages, setCurrentQuestion } = useChatState();
@@ -20,16 +21,17 @@ export const SuggestedQuestions = () => {
 
   return (
     <div className="ai-message initial-message">
+      <AIInitialMessage />
       <div
         className={cn(
-          props.inline && "tv-flex tv-gap-x-3 tv-flex-wrap tv-items-center",
+          props.inline && "tv-flex tv-gap-x-3 tv-flex-wrap tv-items-center"
         )}
       >
         <div
           ref={parent}
           className={cn(
             "questions tv-pt-2 ",
-            props.inline && "inline-questions !tv-pb-0",
+            props.inline && "inline-questions !tv-pb-0"
           )}
         >
           <button

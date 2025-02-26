@@ -56,7 +56,7 @@ pub struct DittoDatasetUsage {
     pub top_search_queries: Vec<HeadQueries>,
     pub low_confidence_search_queries: Vec<SearchQueryEvent>,
     pub chunk_count: i32,
-    pub search_count: i32,
+    pub search_count: i64,
     pub rag_count: u32,
 }
 

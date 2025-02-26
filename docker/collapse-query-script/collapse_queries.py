@@ -13,7 +13,7 @@ def get_search_queries(
         SELECT id, query, top_score, created_at, search_type, request_params, latency, results, query_vector, is_duplicate, query_rating, dataset_id
         FROM default.search_queries 
         WHERE dataset_id = '{}' AND is_duplicate = 0 AND search_type != 'rag'
-        ORDER BY created_at, length(query)
+        ORDER BY created_at DESC
         LIMIT {}
         """.format(
         str(dataset_id), limit
@@ -24,7 +24,7 @@ def get_search_queries(
         FROM default.search_queries 
         WHERE dataset_id = '{}'
             AND created_at >= '{}' AND search_type != 'rag'
-        ORDER BY created_at, length(query)
+        ORDER BY created_at DESC
         LIMIT {}
         """.format(
             str(dataset_id),
@@ -76,65 +76,57 @@ def set_dataset_last_collapsed(
     )
 
 
-def collapse_queries(rows, look_range=10, time_window=10):
-    rows_to_be_deleted = []
-    sorted_rows = sorted(rows, key=lambda x: x[3])  # Sort by timestamp
+def collapse_queries(rows, time_window=5):
+    if not rows:
+        return []
 
-    for i, current_row in enumerate(sorted_rows):
+    # Sort rows by timestamp
+    sorted_rows = sorted(rows, key=lambda x: x[3])
+
+    # Group queries that might be part of the same typing sequence
+    typing_sequences = []
+    current_sequence = [sorted_rows[0]]
+
+    for i in range(1, len(sorted_rows)):
+        current_row = sorted_rows[i]
+        prev_row = current_sequence[-1]
+
+        time_diff = current_row[3] - prev_row[3]
         current_query = current_row[1].strip().lower()
-        is_duplicate = False
-        longest_query = current_query
-        longest_row = current_row
+        prev_query = prev_row[1].strip().lower()
 
-        # Look behind
-        start = max(0, i - look_range)
-        for j in range(start, i):
-            prev_row = sorted_rows[j]
-            prev_query = prev_row[1].strip().lower()
-            time_difference = current_row[3] - prev_row[3]
+        # Check if queries are related by either:
+        # 1. One being a prefix of the other
+        # 2. Having a significant overlap (for handling backspace/corrections)
+        is_related = (
+            current_query.startswith(prev_query)
+            or prev_query.startswith(current_query)
+            or (
+                len(set(current_query) & set(prev_query))
+                / max(len(current_query), len(prev_query))
+                > 0.8
+            )
+        )
 
-            if time_difference > time_window:
-                continue
+        if time_diff <= time_window and is_related:
+            current_sequence.append(current_row)
+        else:
+            typing_sequences.append(current_sequence)
+            current_sequence = [current_row]
 
-            if current_query.startswith(prev_query) or prev_query.startswith(
-                current_query
-            ):
-                is_duplicate = True
-                if len(prev_query) > len(longest_query):
-                    longest_query = prev_query
-                    longest_row = prev_row
+    typing_sequences.append(current_sequence)
 
-        # Look ahead
-        end = min(len(sorted_rows), i + look_range + 1)
-        for j in range(i + 1, end):
-            next_row = sorted_rows[j]
-            next_query = next_row[1].strip().lower()
-            time_difference = next_row[3] - current_row[3]
+    # For each sequence, keep only the longest query and mark others as duplicates
+    rows_to_be_deleted = []
+    for sequence in typing_sequences:
+        if len(sequence) > 1:
+            # Find the longest query in the sequence
+            longest_row = max(sequence, key=lambda x: len(x[1].strip()))
 
-            if time_difference > time_window:
-                break
-
-            if current_query.startswith(next_query) or next_query.startswith(
-                current_query
-            ):
-                is_duplicate = True
-                if len(next_query) > len(longest_query):
-                    longest_query = next_query
-                    longest_row = next_row
-
-        if is_duplicate:
-            if longest_row != current_row:
-                rows_to_be_deleted.append(current_row)
-            else:
-                # If current row is the longest, mark others for deletion
-                for j in range(start, end):
-                    if j != i:
-                        other_row = sorted_rows[j]
-                        other_query = other_row[1].strip().lower()
-                        if current_query.startswith(
-                            other_query
-                        ) or other_query.startswith(current_query):
-                            rows_to_be_deleted.append(other_row)
+            # Mark all other queries in the sequence as duplicates
+            for row in sequence:
+                if row != longest_row:
+                    rows_to_be_deleted.append(row)
 
     return rows_to_be_deleted
 
@@ -181,7 +173,7 @@ def main():
             rows = get_search_queries(client, dataset_id, 5000, last_collapsed)
 
             while rows:
-                last_collapsed = rows[-1][3]
+                last_collapsed = rows[0][3]
 
                 duplicates = collapse_queries(rows)
                 num_duplicates += len(duplicates)

@@ -498,7 +498,7 @@ pub async fn bulk_upload_chunks(
 
     let qdrant_only = dataset_config.QDRANT_ONLY;
 
-    let inserted_chunk_metadatas = if qdrant_only {
+    let inserted_chunk_metadatas = if qdrant_only || payload.only_qdrant.unwrap_or(false) {
         ingestion_data.clone()
     } else {
         log::info!("Inserting {} chunks into database", ingestion_data.len());

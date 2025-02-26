@@ -4,20 +4,19 @@ use crate::{
         EventData, EventDataClickhouse, GetEventsResponseBody, Granularity, HeadQueries, Pool,
         PopularFilters, PopularFiltersClickhouse, RAGAnalyticsFilter, RAGSortBy,
         RAGUsageGraphResponse, RAGUsageResponse, RagQueryEvent, RagQueryEventClickhouse,
-        RecommendationAnalyticsFilter, RecommendationCTRMetrics, RecommendationEvent,
-        RecommendationEventClickhouse, RecommendationsWithClicksCTRResponse,
+        RagQueryRatingsResponse, RecommendationAnalyticsFilter, RecommendationCTRMetrics,
+        RecommendationEvent, RecommendationEventClickhouse, RecommendationsWithClicksCTRResponse,
         RecommendationsWithClicksCTRResponseClickhouse, RecommendationsWithoutClicksCTRResponse,
         RecommendationsWithoutClicksCTRResponseClickhouse, SearchAnalyticsFilter, SearchCTRMetrics,
         SearchCTRMetricsClickhouse, SearchClusterTopics, SearchLatencyGraph,
         SearchLatencyGraphClickhouse, SearchQueriesWithClicksCTRResponse,
         SearchQueriesWithClicksCTRResponseClickhouse, SearchQueriesWithoutClicksCTRResponse,
         SearchQueriesWithoutClicksCTRResponseClickhouse, SearchQueryEvent,
-        SearchQueryEventClickhouse, SearchQueryRating, SearchSortBy, SearchTypeCount, SortOrder,
-        TopDatasetsResponse, TopDatasetsResponseClickhouse, UsageGraphPoint,
-        UsageGraphPointClickhouse,
+        SearchQueryEventClickhouse, SearchSortBy, SearchTypeCount, SortOrder, TopDatasetsResponse,
+        TopDatasetsResponseClickhouse, UsageGraphPoint, UsageGraphPointClickhouse,
     },
     errors::ServiceError,
-    handlers::analytics_handler::{GetTopDatasetsRequestBody, RateQueryRequest},
+    handlers::analytics_handler::GetTopDatasetsRequestBody,
 };
 use actix_web::web;
 use diesel::prelude::*;
@@ -170,24 +169,16 @@ pub async fn get_search_metrics_query(
 ) -> Result<DatasetAnalytics, ServiceError> {
     let mut query_string = String::from(
         "SELECT 
-            total_queries,
-            total_queries / dateDiff('second', min_created_at, max_created_at) AS search_rps,
-            avg_latency,
-            p99,
-            p95,
-            p50
-        FROM (
-            SELECT 
-                count(*) as total_queries,
-                min(created_at) as min_created_at,
-                max(created_at) as max_created_at,
-                avg(latency) as avg_latency,
-                quantile(0.99)(latency) as p99,
-                quantile(0.95)(latency) as p95,
-                quantile(0.5)(latency) as p50
-            FROM search_queries
-            WHERE dataset_id = ?
-        ) subquery",
+            count(*) as total_queries,
+            avg(latency) as avg_latency,
+            quantile(0.99)(latency) as p99,
+            quantile(0.95)(latency) as p95,
+            quantile(0.5)(latency) as p50,
+            round(100 * countIf(JSONExtract(query_rating, 'rating', 'Nullable(Float64)') >= 1) / count(*), 2) as total_positive_ratings,
+            round(100 * countIf(JSONExtract(query_rating, 'rating', 'Nullable(Float64)') <= 0) / count(*), 2) as total_negative_ratings
+        FROM search_queries
+        WHERE dataset_id = ?            
+         ",
     );
 
     if let Some(filter) = filter {
@@ -418,7 +409,7 @@ pub async fn get_query_counts_query(
     let mut query_string = String::from(
         "SELECT 
             search_type,
-            JSONExtractString(request_params, 'search_type') as search_method,
+            JSONExtractString(request_params, 'search_type') as search_method, 
             COUNT(*) as search_count
         FROM 
             search_queries
@@ -1400,72 +1391,6 @@ pub async fn get_recommendations_without_clicks_query(
     Ok(CTRRecommendationsWithoutClicksResponse { recommendations })
 }
 
-pub async fn set_search_query_rating_query(
-    data: RateQueryRequest,
-    dataset_id: uuid::Uuid,
-    clickhouse_client: &clickhouse::Client,
-) -> Result<(), ServiceError> {
-    let rating = SearchQueryRating {
-        rating: data.rating,
-        note: data.note,
-    };
-
-    let stringified_data = serde_json::to_string(&rating).unwrap_or_default();
-
-    clickhouse_client
-        .query(
-            "ALTER TABLE search_queries
-        UPDATE query_rating = ?
-        WHERE id = ? AND dataset_id = ?",
-        )
-        .bind(stringified_data)
-        .bind(data.query_id)
-        .bind(dataset_id)
-        .execute()
-        .await
-        .map_err(|err| {
-            log::error!("Error altering to ClickHouse search_queries: {:?}", err);
-            ServiceError::InternalServerError(
-                "Error altering to ClickHouse search_queries".to_string(),
-            )
-        })?;
-
-    Ok(())
-}
-
-pub async fn set_rag_query_rating_query(
-    data: RateQueryRequest,
-    dataset_id: uuid::Uuid,
-    clickhouse_client: &clickhouse::Client,
-) -> Result<(), ServiceError> {
-    let rating = SearchQueryRating {
-        rating: data.rating,
-        note: data.note,
-    };
-
-    let stringified_data = serde_json::to_string(&rating).unwrap_or_default();
-
-    clickhouse_client
-        .query(
-            "ALTER TABLE rag_queries
-        UPDATE query_rating = ?
-        WHERE id = ? AND dataset_id = ?",
-        )
-        .bind(stringified_data)
-        .bind(data.query_id)
-        .bind(dataset_id)
-        .execute()
-        .await
-        .map_err(|err| {
-            log::error!("Error altering to ClickHouse rag_queries: {:?}", err);
-            ServiceError::InternalServerError(
-                "Error altering to ClickHouse rag_queries".to_string(),
-            )
-        })?;
-
-    Ok(())
-}
-
 pub async fn get_top_datasets_query(
     data: GetTopDatasetsRequestBody,
     organization_id: uuid::Uuid,
@@ -1629,4 +1554,34 @@ pub async fn get_all_events_query(
     let events: Vec<EventData> = clickhouse_query.into_iter().map(|q| q.into()).collect_vec();
 
     Ok(GetEventsResponseBody { events })
+}
+
+pub async fn get_rag_query_ratings_query(
+    dataset_id: uuid::Uuid,
+    filter: Option<RAGAnalyticsFilter>,
+    clickhouse_client: &clickhouse::Client,
+) -> Result<RagQueryRatingsResponse, ServiceError> {
+    let mut query_string = String::from(
+        "SELECT
+            round(countIf(JSONExtract(query_rating, 'rating', 'Nullable(Float64)') >= 1), 2) as total_positive_ratings,
+            round(countIf(JSONExtract(query_rating, 'rating', 'Nullable(Float64)') <= 0), 2) as total_negative_ratings
+        FROM rag_queries
+        WHERE dataset_id = ?",
+    );
+
+    if let Some(filter) = filter {
+        query_string = filter.add_to_query(query_string);
+    }
+
+    let response = clickhouse_client
+        .query(query_string.as_str())
+        .bind(dataset_id)
+        .fetch_one::<RagQueryRatingsResponse>()
+        .await
+        .map_err(|e| {
+            log::error!("Error fetching query: {:?}", e);
+            ServiceError::InternalServerError("Error fetching query".to_string())
+        })?;
+
+    Ok(response)
 }

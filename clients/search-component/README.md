@@ -109,6 +109,9 @@ declare module "solid-js" {
 | buttonTriggers             | [{ selector: <"query-selector">, mode: "chat"|"search" }]                                      | []                                                                    |      
 | hideopenButton             | boolean                                                                                        | false                                                                 |
 | showResultHighlights       | boolean                                                                                        | true                                                                  |
+| initialAiMessage           | string (example: "<p>Hi! How can I help</p>")                                                  | null                                                                  |
+| ignoreEventListeners       | boolean                                                                                        | false                                                                 |
+| hideOverlay                | boolean                                                                                        | false                                                                 |
 
 
 ### Search Results

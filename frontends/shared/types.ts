@@ -466,7 +466,7 @@ export interface AnalyticsFilter {
   search_type?:
     | "search"
     | "autocomplete"
-    | "rag"
+    | "rag_chunks"
     | "search_over_groups"
     | "search_within_groups";
 }
@@ -674,6 +674,22 @@ export interface QueryCountResponse {
 
 export interface HeadQueryResponse {
   queries: HeadQuery[];
+}
+
+export interface SearchMetricsResponse {
+  total_queries: number;
+  search_rps: number;
+  avg_latency: number;
+  p99: number;
+  p95: number;
+  p50: number;
+  percent_thumbs_up: number;
+  percent_thumbs_down: number;
+}
+
+export interface RagQueryRatingResponse {
+  percent_thumbs_up: number;
+  percent_thumbs_down: number;
 }
 
 export interface SearchQueryResponse {

@@ -125,6 +125,7 @@ export const GroupPage = (props: GroupPageProps) => {
     rating: 5,
     note: "",
   });
+  const [allGroupsList, setAllGroupsList] = createSignal<ChunkGroupDTO[]>([]);
 
   createEffect(() => {
     fetchBookmarks();
@@ -182,6 +183,55 @@ export const GroupPage = (props: GroupPageProps) => {
       }
     });
   };
+
+  const fetchAllGroups = async () => {
+    let currentPage = 1;
+    let hasMore = true;
+    const currentDataset = $dataset?.();
+    if (!currentDataset) return;
+
+    while (hasMore) {
+      const response = await fetch(
+        `${apiHost}/dataset/groups/${currentDataset.dataset.id}/${currentPage}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "X-API-version": "2.0",
+            "TR-Dataset": currentDataset.dataset.id,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (response.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const data = await response.json();
+        if (isChunkGroupPageDTO(data)) {
+          setAllGroupsList((prevGroups) => {
+            return [...prevGroups, ...data.groups];
+          });
+          hasMore = currentPage < data.total_pages && currentPage < 100;
+          currentPage++;
+        } else {
+          hasMore = false;
+        }
+      } else {
+        hasMore = false;
+      }
+
+      if (hasMore) {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+      }
+    }
+  };
+
+  createEffect(() => {
+    const currentDataset = $dataset?.();
+    if (!currentDataset) return;
+
+    void fetchAllGroups();
+  });
 
   createEffect(() => {
     const resultsLength = chunkMetadatas().length;
@@ -655,7 +705,7 @@ export const GroupPage = (props: GroupPageProps) => {
               </span>
             </div>
           </Show>
-          <Show when={groupInfo()?.tag_set?.length}>
+          <Show when={groupInfo()?.tag_set?.filter((tag) => tag).length}>
             <div class="flex space-x-2">
               <span class="font-semibold text-neutral-800 dark:text-neutral-200">
                 Tag Set:{" "}
@@ -878,6 +928,7 @@ export const GroupPage = (props: GroupPageProps) => {
                 {(chunk) => (
                   <div class="mt-4">
                     <ScoreChunk
+                      allGroupsList={allGroupsList()}
                       totalGroupPages={totalGroupPages()}
                       chunk={!isScoreChunkDTO(chunk) ? chunk : chunk.chunk}
                       score={isScoreChunkDTO(chunk) ? chunk.score : 0}
@@ -914,6 +965,7 @@ export const GroupPage = (props: GroupPageProps) => {
                   <>
                     <div class="mt-4">
                       <ChunkMetadataDisplay
+                        allGroupsList={allGroupsList()}
                         totalGroupPages={totalGroupPages()}
                         chunk={chunk.chunk}
                         chunkGroups={chunkGroups()}
@@ -1013,6 +1065,7 @@ export const GroupPage = (props: GroupPageProps) => {
                           {(chunk, i) => (
                             <div class="ml-5 flex space-y-4">
                               <ScoreChunk
+                                allGroupsList={allGroupsList()}
                                 totalGroupPages={totalGroupPages()}
                                 chunkGroups={chunkGroups()}
                                 chunk={chunk.chunk}

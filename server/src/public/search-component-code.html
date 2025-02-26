@@ -109,18 +109,18 @@
       {% if params.debounceMs -%}
       debounceMs: {{ params.debounceMs }},
       {% endif -%}
-      {% if params.numberOfSuggestions %}
+      {% if params.numberOfSuggestions -%}
       numberOfSuggestions: {{ params.numberOfSuggestions }}
-      {% endif %}
-      {% if params.inlineHeader %}
+      {% endif -%}
+      {% if params.inlineHeader -%}
       inlineHeader: {{ params.inlineHeader }}
-      {% endif %}
-      {% if params.showResultHighlights %}
+      {% endif -%}
+      {% if params.showResultHighlights -%}
       showResultHighlights: {{ params.showResultHighlights }}
-      {% endif %}
-      {% if params.defaultImageQuestion %}
+      {% endif -%}
+      {% if params.defaultImageQuestion -%}
       defaultImageQuestion: {{ params.defaultImageQuestion }}
-      {% endif %}
+      {% endif -%}
     })
   });
 &lt;/script&gt;

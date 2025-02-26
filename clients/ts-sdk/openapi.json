@@ -9825,36 +9825,48 @@
         "title": "SearchMetricsResponse",
         "required": [
           "total_queries",
-          "search_rps",
           "avg_latency",
           "p99",
           "p95",
-          "p50"
+          "p50",
+          "total_positive_ratings",
+          "total_negative_ratings"
         ],
         "properties": {
           "avg_latency": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "Average latency of search queries"
           },
           "p50": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "50th percentile latency of search queries"
           },
           "p95": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "95th percentile latency of search queries"
           },
           "p99": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "99th percentile latency of search queries"
           },
-          "search_rps": {
+          "total_negative_ratings": {
             "type": "number",
-            "format": "double"
+            "format": "double",
+            "description": "Total number of searches with a negative rating"
+          },
+          "total_positive_ratings": {
+            "type": "number",
+            "format": "double",
+            "description": "Total number of searches with a positive rating"
           },
           "total_queries": {
             "type": "integer",
-            "format": "int32"
+            "format": "int64",
+            "description": "Total number of search queries"
           }
         }
       },
@@ -10728,12 +10740,16 @@
             "title": "Click",
             "required": [
               "event_name",
-              "clicked_items",
               "event_type"
             ],
             "properties": {
               "clicked_items": {
-                "$ref": "#/components/schemas/ChunkWithPosition"
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ChunkWithPosition"
+                  }
+                ],
+                "nullable": true
               },
               "event_name": {
                 "type": "string",
@@ -13695,6 +13711,29 @@
                 ]
               }
             }
+          },
+          {
+            "type": "object",
+            "title": "RAGQueryRatings",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "filter": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/RAGAnalyticsFilter"
+                  }
+                ],
+                "nullable": true
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "rag_query_ratings"
+                ]
+              }
+            }
           }
         ],
         "discriminator": {
@@ -13735,6 +13774,9 @@
           },
           {
             "$ref": "#/components/schemas/RagQueryEvent"
+          },
+          {
+            "$ref": "#/components/schemas/RagQueryRatingsResponse"
           }
         ]
       },
@@ -13849,6 +13891,26 @@
           }
         }
       },
+      "RagQueryRatingsResponse": {
+        "type": "object",
+        "title": "RagQueryRatingsResponse",
+        "required": [
+          "total_positive_ratings",
+          "total_negative_ratings"
+        ],
+        "properties": {
+          "total_negative_ratings": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total number of negative RAG ratings"
+          },
+          "total_positive_ratings": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total number of positive RAG ratings"
+          }
+        }
+      },
       "RagQueryResponse": {
         "type": "object",
         "title": "RagQueryResponse",
@@ -13933,6 +13995,9 @@
           "rating"
         ],
         "properties": {
+          "metadata": {
+            "nullable": true
+          },
           "note": {
             "type": "string",
             "nullable": true
@@ -15894,6 +15959,9 @@
           "rating"
         ],
         "properties": {
+          "metadata": {
+            "nullable": true
+          },
           "note": {
             "type": "string",
             "nullable": true
@@ -16909,6 +16977,10 @@
                 "$ref": "#/components/schemas/ChunkFilter"
               }
             ],
+            "nullable": true
+          },
+          "is_followup": {
+            "type": "boolean",
             "nullable": true
           },
           "query": {

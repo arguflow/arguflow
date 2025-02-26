@@ -20,6 +20,8 @@ import {
   RecommendationEvent,
   EventData,
   DateRangeFilter,
+  SearchMetricsResponse,
+  RagQueryRatingResponse,
 } from "shared/types";
 import { transformAnalyticsFilter } from "../utils/formatDate";
 
@@ -170,6 +172,33 @@ export const getRAGUsage = async (
   return data;
 };
 
+export const getRAGMetrics = async (
+  dateRange: DateRangeFilter,
+  datasetId: string,
+): Promise<RagQueryRatingResponse> => {
+  const response = await fetch(`${apiHost}/analytics/rag`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "TR-Dataset": datasetId,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      type: "rag_query_ratings",
+      filter: transformAnalyticsFilter({
+        date_range: dateRange,
+      }),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch head queries: ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as unknown as RagQueryRatingResponse;
+  return data;
+};
+
 export const getRagUsageGraph = async (
   filters: RAGAnalyticsFilter,
   granularity: AnalyticsParams["granularity"],
@@ -284,6 +313,35 @@ export const getQueryCounts = async (
 
   const data = (await response.json()) as unknown as QueryCountResponse;
   return data.total_queries;
+};
+
+export const getSearchMetrics = async (
+  dateRange: DateRangeFilter,
+  datasetId: string,
+): Promise<SearchMetricsResponse> => {
+  const response = await fetch(`${apiHost}/analytics/search`, {
+    credentials: "include",
+    method: "POST",
+    body: JSON.stringify({
+      filter: transformAnalyticsFilter({
+        date_range: dateRange,
+      }),
+      type: "search_metrics",
+    }),
+    headers: {
+      "TR-Dataset": datasetId,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch no result queries: ${response.statusText}`,
+    );
+  }
+
+  const data = (await response.json()) as SearchMetricsResponse;
+  return data;
 };
 
 export const getSearchQuery = async (

@@ -1,25 +1,36 @@
-import { useEffect, useState } from "react";
-import { SuggestedQueriesResponse } from "trieve-ts-sdk";
+import { useEffect, useMemo, useState } from "react";
 import { getSuggestedQuestions } from "../trieve";
 import { useModalState } from "./modal-context";
 import { useChatState } from "./chat-context";
 
 export const useFollowupQuestions = () => {
   const { trieveSDK, currentGroup, props } = useModalState();
-  const { messages } = useChatState();
+  const { messages, isDoneReading } = useChatState();
   const [isLoading, setIsLoading] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState<
-    SuggestedQueriesResponse["queries"]
-  >([]);
+    Record<string, string[]>
+  >({});
 
   const getFollowUpQuestions = async () => {
     setIsLoading(true);
-    const prevMessage =
+    const prevUserMessages =
       messages
         .filter((msg) => {
           return msg.type == "user";
-        })
-        .slice(-1)[0] ?? messages.slice(-1)[0];
+        }) ?? messages;
+
+    const prevChunks =
+      messages
+        .filter((msg) => {
+          return msg.type == "system";
+        }).slice(-1)[0].additional ?? messages.slice(-1)[0].additional;
+
+    const prevMessage = prevUserMessages.slice(-1)[0];
+
+    if (!prevMessage) {
+      setIsLoading(false);
+      return;
+    }
 
     const queries = await getSuggestedQuestions({
       trieve: trieveSDK,
@@ -28,17 +39,24 @@ export const useFollowupQuestions = () => {
       groupTrackingId: props.inline
         ? (props.groupTrackingId ?? currentGroup?.tracking_id)
         : currentGroup?.tracking_id,
+      is_followup: true,
+      prevUserMessages: prevUserMessages.map((message) => message.text),
+      chunks: prevChunks,
       props,
     });
-    setSuggestedQuestions(
-      queries.queries.map((q) => {
+    setSuggestedQuestions((prev) => ({
+      ...prev,
+      [prevMessage.text]: queries.queries.map((q) => {
         return q.replace(/^[\d.-]+\s*/, "").trim();
-      })
-    );
+      }),
+    }));
     setIsLoading(false);
   };
 
   useEffect(() => {
+    if (!isDoneReading) {
+      return;
+    }
     setIsLoading(true);
     const abortController = new AbortController();
 
@@ -50,11 +68,27 @@ export const useFollowupQuestions = () => {
       clearTimeout(timeoutId);
       abortController.abort("fetch aborted");
     };
-  }, []);
+  }, [messages, isDoneReading]);
+
+  const filteredSuggestedQuestions = useMemo(() => {
+    const prevMessage =
+      messages
+        .filter((msg) => {
+          return msg.type == "user";
+        })
+        .slice(-1)[0] ?? messages.slice(-1)[0];
+
+    if (!prevMessage) {
+      return [];
+    }
+
+    return prevMessage.text in suggestedQuestions
+      ? suggestedQuestions[prevMessage.text]
+      : [];
+  }, [messages, suggestedQuestions]);
 
   return {
-    suggestedQuestions,
-    getQuestions: getFollowUpQuestions,
+    suggestedQuestions: filteredSuggestedQuestions,
     isLoadingSuggestedQueries: isLoading,
   };
 };

@@ -10,14 +10,16 @@ import SearchMode from "./Search/SearchMode";
 import ChatMode from "./Chat/ChatMode";
 
 export const ModalContainer = () => {
-  const { mode, props } = useModalState();
+  const { mode, props, open } = useModalState();
   const [fullscreenPdfState] = useAtom(pdfViewState);
 
   const componentClass = useSizing();
+
   return (
     <div
       id="trieve-search-modal"
       className={cn(
+        "tv-flex tv-flex-col tv-items-stretch",
         "tv-scroll-smooth tv-rounded-lg focus:tv-outline-none tv-overflow-hidden tv-text-base tv-text-zinc-950 tv-bg-white",
         `${mode === "chat" ? "chat-modal-mobile" : ""}${
           props.theme === "dark" ? " dark tv-dark" : ""
@@ -26,16 +28,13 @@ export const ModalContainer = () => {
             ? " trieve-inline-modal tv-trieve-inline-modal"
             : " trieve-popup-modal"
         } ${props.type}`.trim(),
-
         !props.inline && "md:tv-resize-y",
-
         props.inline && "tv-border-2",
-
-        "tv-flex tv-flex-col tv-items-stretch",
         componentClass
       )}
       style={{
-        zIndex: props.zIndex ? props.zIndex + 1 : 1001,
+        zIndex: (props.zIndex ?? 1000) + 1,
+        display: open || props.inline ? "flex" : "none",
       }}
     >
       {!props.inline && !fullscreenPdfState && <ChatModeSwitch />}

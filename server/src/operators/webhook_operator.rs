@@ -48,7 +48,7 @@ pub async fn publish_content<T: Into<ChunkReqPayload>>(
 ) -> Result<(), ServiceError> {
     let chunk: ChunkReqPayload = value.into();
 
-    let (upsert_message, _) = create_chunk_metadata(vec![chunk.clone()], dataset_id).await?;
+    let (upsert_message, _) = create_chunk_metadata(vec![chunk.clone()], dataset_id)?;
 
     broccoli_queue
         .publish(

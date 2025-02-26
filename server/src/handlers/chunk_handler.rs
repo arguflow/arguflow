@@ -217,6 +217,7 @@ pub struct UploadIngestionMessage {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BulkUploadIngestionMessage {
     pub attempt_number: usize,
+    pub only_qdrant: Option<bool>,
     pub dataset_id: uuid::Uuid,
     pub ingestion_messages: Vec<UploadIngestionMessage>,
 }
@@ -374,10 +375,10 @@ pub async fn create_chunk(
         chunks.partition(|chunk| chunk.upsert_by_tracking_id.unwrap_or(false));
 
     let (non_upsert_chunk_ingestion_message, non_upsert_chunk_metadatas) =
-        create_chunk_metadata(non_upsert_chunks, dataset_org_plan_sub.dataset.id).await?;
+        create_chunk_metadata(non_upsert_chunks, dataset_org_plan_sub.dataset.id)?;
 
     let (upsert_chunk_ingestion_message, upsert_chunk_metadatas) =
-        create_chunk_metadata(upsert_chunks, dataset_org_plan_sub.dataset.id).await?;
+        create_chunk_metadata(upsert_chunks, dataset_org_plan_sub.dataset.id)?;
 
     let chunk_metadatas = non_upsert_chunk_metadatas
         .clone()
@@ -418,6 +419,7 @@ pub async fn create_chunk(
                         attempt_number: 0,
                         dataset_id: dataset_org_plan_sub.dataset.id,
                         ingestion_messages: prio_chunks_message.clone(),
+                        only_qdrant: None,
                     },
                     None,
                 )
@@ -435,6 +437,7 @@ pub async fn create_chunk(
                         attempt_number: 0,
                         dataset_id: dataset_org_plan_sub.dataset.id,
                         ingestion_messages: non_prio_chunks_message,
+                        only_qdrant: None,
                     },
                     None,
                 )
@@ -452,6 +455,7 @@ pub async fn create_chunk(
                         attempt_number: 0,
                         dataset_id: dataset_org_plan_sub.dataset.id,
                         ingestion_messages: non_prio_chunks_message,
+                        only_qdrant: None,
                     },
                     None,
                 )
@@ -486,6 +490,7 @@ pub async fn create_chunk(
                         attempt_number: 0,
                         dataset_id: dataset_org_plan_sub.dataset.id,
                         ingestion_messages: prio_chunks_message.clone(),
+                        only_qdrant: None,
                     },
                     None,
                 )
@@ -503,6 +508,7 @@ pub async fn create_chunk(
                         attempt_number: 0,
                         dataset_id: dataset_org_plan_sub.dataset.id,
                         ingestion_messages: non_prio_chunks_message,
+                        only_qdrant: None,
                     },
                     None,
                 )
@@ -520,6 +526,7 @@ pub async fn create_chunk(
                         attempt_number: 0,
                         dataset_id: dataset_org_plan_sub.dataset.id,
                         ingestion_messages: non_prio_chunks_message,
+                        only_qdrant: None,
                     },
                     None,
                 )
@@ -756,6 +763,7 @@ pub struct UpdateIngestionMessage {
     pub convert_html_to_text: Option<bool>,
     pub fulltext_boost: Option<FullTextBoost>,
     pub semantic_boost: Option<SemanticBoost>,
+    pub only_qdrant: Option<bool>,
 }
 
 /// Update Chunk
@@ -885,6 +893,7 @@ pub async fn update_chunk(
         convert_html_to_text: update_chunk_data.convert_html_to_text,
         fulltext_boost: update_chunk_data.fulltext_boost.clone(),
         semantic_boost: update_chunk_data.semantic_boost.clone(),
+        only_qdrant: Some(false),
     };
 
     broccoli_queue
@@ -1024,6 +1033,7 @@ pub async fn update_chunk_by_tracking_id(
         convert_html_to_text: update_chunk_data.convert_html_to_text,
         fulltext_boost: None,
         semantic_boost: None,
+        only_qdrant: Some(false),
     };
 
     broccoli_queue

@@ -2455,7 +2455,7 @@ pub async fn get_row_count_for_organization_id_query(
     Ok(chunk_metadata_count as usize)
 }
 
-pub async fn create_chunk_metadata(
+pub fn create_chunk_metadata(
     chunks: Vec<ChunkReqPayload>,
     dataset_uuid: uuid::Uuid,
 ) -> Result<(BulkUploadIngestionMessage, Vec<ChunkMetadata>), ServiceError> {
@@ -2526,6 +2526,7 @@ pub async fn create_chunk_metadata(
             attempt_number: 0,
             dataset_id: dataset_uuid,
             ingestion_messages,
+            only_qdrant: None,
         },
         chunk_metadatas,
     ))

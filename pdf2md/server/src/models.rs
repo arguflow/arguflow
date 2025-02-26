@@ -220,15 +220,13 @@ impl From<TaskResponse> for Vec<Chunk> {
             for chunk in output.chunks {
                 for segment in chunk.segments {
                     let page_num = segment.page_number;
-                    if let Some(markdown) = segment.markdown {
-                        page_contents
-                            .entry(page_num)
-                            .and_modify(|content| {
-                                content.push_str("\n\n");
-                                content.push_str(&markdown);
-                            })
-                            .or_insert(markdown);
-                    }
+                    page_contents
+                        .entry(page_num)
+                        .and_modify(|content| {
+                            content.push_str("\n\n");
+                            content.push_str(&segment.markdown);
+                        })
+                        .or_insert(segment.markdown);
                 }
             }
 
@@ -306,7 +304,14 @@ impl GetTaskResponse {
         Self {
             id: task.id.clone(),
             file_name: task.file_name.clone(),
-            file_url: Some(chunkr_task.pdf_url.unwrap_or_default()),
+            file_url: Some(
+                chunkr_task
+                    .output
+                    .ok_or("No output found")
+                    .unwrap()
+                    .pdf_url
+                    .unwrap_or_default(),
+            ),
             total_document_pages: task.pages,
             pages_processed: match chunkr_task.status {
                 Status::Succeeded => task.pages,

@@ -1,0 +1,192 @@
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/trieve-search-component@0.4.24/dist/index.css"
+/>
+
+<div class="trieve-recommendations">
+</div>
+
+<script type="module">
+  import {renderRecommendationsToDiv} from 'https://unpkg.com/trieve-search-component@0.4.24/dist/vanilla/index.js';
+
+  const inlineRoot = document.querySelector(".trieve-recommendations");
+
+  const available = {{product.available}};
+
+  const toBool = (value) => {
+    if (typeof value === 'string') {
+      return value === 'true';
+    } else if (typeof value === 'boolean') {
+      return value;
+    } else {
+      return false;
+    }
+  }
+
+  const getValue = (value, defaultValue) => {
+    if (value === null || value === undefined || value === '') {
+      return defaultValue;
+    }
+    return value;
+  };
+
+  const theme = {
+    mode: getValue("{{ block.settings.theme_mode }}", "light"),
+    rounded: getValue("{{ block.settings.theme_rounded }}", "md"),
+    font: getValue("{{ block.settings.theme_font }}", ""),
+    padding: getValue("{{ block.settings.theme_padding }}", "md"),
+    shadow: getValue("{{ block.settings.theme_shadow }}", "md"),
+    border: getValue("{{ block.settings.theme_border }}", ""),
+    containerClassName: getValue(
+      "{{ block.settings.theme_container_class_name }}",
+      ""
+    ),
+    itemClassName: getValue("{{ block.settings.theme_item_class_name }}", ""),
+    containerStyles: getValue("{{ block.settings.theme_container_styles }}", ""),
+    itemStyles: getValue("{{ block.settings.theme_item_styles }}", ""),
+  };
+
+  const onlyShowIfNotAvailable = toBool(getValue("{{ block.settings.only_show_if_not_available }}", false));
+  const shouldShow = onlyShowIfNotAvailable ? !available : true;
+
+  if (shouldShow) {
+    renderRecommendationsToDiv(inlineRoot, {
+      apiKey: getValue("{{ block.settings.api_key }}", ""),
+      datasetId: getValue("{{ block.settings.dataset_id }}", ""),
+      baseUrl: getValue("{{ block.settings.base_url }}", "https://api.trieve.ai"),
+      productId: getValue("{{ product.id }}", ""),
+      overflowScroll: toBool(getValue("{{ block.settings.overflow_scroll }}", true)),
+      maxResults: Number(getValue("{{ block.settings.max_results }}", 5)),
+      title: getValue("{{ block.settings.title }}", null),
+      orientation: getValue("{{ block.settings.orientation }}", "horizontal"),
+      theme: theme,
+    });
+  }
+
+</script>
+
+
+{% comment %}
+  see more about the schema section here. https://shopify.dev/docs/storefronts/themes/architecture/sections/section-schema#schema
+
+  If the input is not valid json, it will not work
+{% endcomment %}
+{% schema %}
+{
+  "name": "Trieve Related Products",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "base_url",
+      "label": "Base URL",
+      "default": "https://api.trieve.ai"
+    },
+    {
+      "type": "text",
+      "id": "api_key",
+      "label": "Trieve API Key"
+    },
+    {
+      "type": "text",
+      "id": "dataset_id",
+      "label": "Dataset ID"
+    },
+    {
+      "type": "select",
+      "id": "orientation",
+      "label": "Orientation",
+      "options": [
+        {"label": "Horizontal", "value": "horizontal"},
+        {"label": "Vertical", "value": "vertical"}
+      ],
+      "default": "horizontal"
+    },
+    {
+      "type": "checkbox",
+      "id": "only_show_if_not_available",
+      "label": "Only Show If Not Available",
+      "default": false,
+      "info": "Only show the recommendations when the product is not available"
+    },
+    {
+      "type": "number",
+      "id": "max_results",
+      "label": "Max Results",
+      "default": 5
+    },
+    {
+      "type": "checkbox",
+      "id": "overflow_scroll",
+      "label": "Overflow Scroll",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Title",
+      "default": "Similar Products"
+    },
+    {
+      "type": "header",
+      "content": "Theme Settings"
+    },
+    {
+      "type": "select",
+      "id": "theme_mode",
+      "label": "Mode",
+      "options": [
+        {"label": "Light", "value": "light"},
+        {"label": "Dark", "value": "dark"}
+      ],
+      "default": "light"
+    },
+    {
+      "type": "select",
+      "id": "theme_rounded",
+      "label": "Theme Rounded",
+      "options": [
+        {"label": "Small", "value": "sm"},
+        {"label": "Medium", "value": "md"},
+        {"label": "Large", "value": "lg"},
+        {"label": "None", "value": "none"}
+      ],
+      "default": "md"
+    },
+    {
+      "type": "text",
+      "id": "theme_font",
+      "label": "Font"
+    },
+    {
+      "type": "select",
+      "id": "theme_padding",
+      "label": "Padding",
+      "options": [
+        {"label": "Small", "value": "sm"},
+        {"label": "Medium", "value": "md"},
+        {"label": "Large", "value": "lg"},
+        {"label": "Extra Large", "value": "xl"}
+      ],
+      "default": "md"
+    },
+    {
+      "type": "select",
+      "id": "theme_shadow",
+      "label": "Shadow",
+      "options": [
+        {"label": "Small", "value": "sm"},
+        {"label": "Medium", "value": "md"},
+        {"label": "Large", "value": "lg"},
+        {"label": "None", "value": "none"}
+      ],
+      "default": "md"
+    },
+    {
+      "type": "text",
+      "id": "theme_border",
+      "label": "Border Color"
+    }
+  ]
+}
+{% endschema %}

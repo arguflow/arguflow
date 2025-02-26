@@ -39,6 +39,7 @@ export default function ECommerce() {
   const inline = import.meta.env.VITE_INLINE == "true";
   const showResultHighlights =
     import.meta.env.VITE_SHOW_RESULT_HIGHLIGHTS == "true";
+  const inlineCarousel = import.meta.env.VITE_INLINE_CAROUSEL == "true";
 
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [component, setComponent] = useState(0);
@@ -48,12 +49,14 @@ export default function ECommerce() {
       <div
         className={`p-12 flex flex-col items-center justify-center w-screen h-screen relative ${
           theme === "dark" ? "bg-zinc-900 text-zinc-50" : ""
-        }`}>
+        }`}
+      >
         <div className="absolute top-6 right-6">
           <ul>
             <li key="theme">
               <button
-                onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
+                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              >
                 {theme === "light" ? (
                   <span>
                     <i className="fa-regular fa-sun"></i>
@@ -108,6 +111,7 @@ export default function ECommerce() {
               debounceMs={10}
               floatingSearchIconPosition={floatingSearchIconPosition}
               showFloatingSearchIcon={showFloatingSearchIcon}
+              inlineCarousel={inlineCarousel}
               showFloatingInput={showFloatingInput}
               inline={inline}
               showResultHighlights={showResultHighlights}

@@ -2,18 +2,17 @@ import React from "react";
 import { useModalState } from "../../utils/hooks/modal-context";
 import { SparklesIcon } from "../icons";
 
-
 export const AIInitialMessage = () => {
   const { props } = useModalState();
   if (!props.initialAiMessage) return null;
 
   return (
-    <div 
+    <div
       style={{
-        display: props.initialAiMessage ? "flex" : "none"
+        display: props.initialAiMessage ? "flex" : "none",
       }}
-      >
-      <span className="ai-avatar tv-w-full">
+    >
+      <span className="ai-avatar assistant">
         {props.brandLogoImgSrcUrl ? (
           <img
             src={props.brandLogoImgSrcUrl}
@@ -23,8 +22,10 @@ export const AIInitialMessage = () => {
           <SparklesIcon />
         )}
       </span>
-      <span className="content" dangerouslySetInnerHTML={{ __html : props.initialAiMessage}}>
-      </span>
+      <span
+        className="content tv-w-fit"
+        dangerouslySetInnerHTML={{ __html: props.initialAiMessage }}
+      ></span>
     </div>
   );
 };

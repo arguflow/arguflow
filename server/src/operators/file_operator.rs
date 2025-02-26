@@ -180,8 +180,22 @@ pub fn preprocess_file_to_chunks(
     html_content: String,
     upload_file_data: UploadFileReqPayload,
 ) -> Result<Vec<String>, ServiceError> {
-    let split_regex: Option<Regex> = upload_file_data
-        .split_delimiters
+    let split_delims = if let Some(split_delims) = upload_file_data.split_delimiters {
+        let filtered_delimeters: Vec<String> = split_delims
+            .into_iter()
+            .filter(|delim| !delim.is_empty())
+            .collect::<Vec<String>>();
+
+        if filtered_delimeters.is_empty() {
+            None
+        } else {
+            Some(filtered_delimeters)
+        }
+    } else {
+        None
+    };
+
+    let split_regex: Option<Regex> = split_delims
         .map(|delimiters| {
             build_chunking_regex(delimiters).map_err(|e| {
                 log::error!("Could not parse chunking delimiters {:?}", e);
@@ -385,12 +399,10 @@ pub async fn create_file_chunks(
     log::info!("Queuing chunks for creation");
     for chunk_segment in chunk_segments {
         let (ingestion_message, chunk_metadatas) =
-            create_chunk_metadata(chunk_segment, dataset_org_plan_sub.dataset.id)
-                .await
-                .map_err(|e| {
-                    log::error!("Could not create chunk metadata {:?}", e);
-                    ServiceError::BadRequest("Could not create chunk metadata".to_string())
-                })?;
+            create_chunk_metadata(chunk_segment, dataset_org_plan_sub.dataset.id).map_err(|e| {
+                log::error!("Could not create chunk metadata {:?}", e);
+                ServiceError::BadRequest("Could not create chunk metadata".to_string())
+            })?;
 
         if chunk_metadatas.is_empty() {
             continue;

@@ -4,10 +4,11 @@ use tokio::sync::mpsc;
 
 use crate::{
     data::models::{
-        RagQueryEventClickhouse, RecommendationEventClickhouse, SearchQueryEventClickhouse,
-        WorkerEventClickhouse,
+        EventDataClickhouse, RagQueryEventClickhouse, RecommendationEventClickhouse,
+        SearchQueryEventClickhouse, SearchQueryRating, WorkerEventClickhouse,
     },
     errors::ServiceError,
+    handlers::analytics_handler::RateQueryRequest,
 };
 
 #[derive(Debug, Clone)]
@@ -15,7 +16,10 @@ pub enum ClickHouseEvent {
     SearchQueryEvent(SearchQueryEventClickhouse),
     RecommendationEvent(RecommendationEventClickhouse),
     RagQueryEvent(RagQueryEventClickhouse),
+    AnalyticsEvent(EventDataClickhouse),
     WorkerEvent(WorkerEventClickhouse),
+    RagQueryRatingEvent(RateQueryRequest),
+    SearchQueryRatingEvent(RateQueryRequest),
 }
 
 pub fn get_latency_from_header(header: String) -> f32 {
@@ -38,7 +42,10 @@ pub async fn send_to_clickhouse(
         return Ok(());
     }
 
-    let mut search_queries_inserter = String::from("INSERT INTO search_queries (id, search_type, query, request_params, query_vector, latency, top_score, results, dataset_id, created_at) VALUES");
+    let mut search_queries_inserter = clickhouse_client.insert("search_queries").map_err(|e| {
+        log::error!("Error inserting search queries: {:?}", e);
+        ServiceError::InternalServerError(format!("Error inserting search queries: {:?}", e))
+    })?;
 
     let mut rag_queries_inserter = clickhouse_client.insert("rag_queries").map_err(|e| {
         log::error!("Error inserting rag queries: {:?}", e);
@@ -56,45 +63,24 @@ pub async fn send_to_clickhouse(
         ServiceError::InternalServerError(format!("Error inserting recommendations: {:?}", e))
     })?;
 
-    for event in events {
+    let mut analytics_events_inserter = clickhouse_client.insert("events").map_err(|e| {
+        log::error!("Error inserting analytics: {:?}", e);
+        ServiceError::InternalServerError(format!("Error inserting analytics: {:?}", e))
+    })?;
+
+    for event in &events {
         match event {
-            ClickHouseEvent::SearchQueryEvent(mut event) => {
-                event.results.iter_mut().for_each(|result| {
-                    *result = result
-                        .replace('\'', "''")
-                        .replace('?', "|q")
-                        .replace('\n', "")
-                });
-
-                search_queries_inserter.push_str(&format!(
-                    " ('{}', '{}', '{}', '{}', embed_p('{}'), '{}', '{}', ['{}'], '{}', now()),",
-                    event.id,
-                    event.search_type,
-                    event.query.replace('?', "|q"),
-                    event.request_params.replace('?', "|q"),
-                    event.query.replace('?', "|q"),
-                    event.latency,
-                    event.top_score,
-                    event.results.join("','"),
-                    event.dataset_id
-                ));
-
-                if search_queries_inserter.len() > 13000 {
-                    clickhouse_client
-                        .query(&search_queries_inserter[..search_queries_inserter.len() - 1])
-                        .execute()
-                        .await
-                        .map_err(|err| {
-                            log::error!("Error writing to ClickHouse search_queries: {:?}", err);
-                            ServiceError::InternalServerError(
-                                "Error writing to ClickHouse search_queries".to_string(),
-                            )
-                        })?;
-                    search_queries_inserter = String::from("INSERT INTO search_queries (id, search_type, query, request_params, query_vector, latency, top_score, results, dataset_id, created_at) VALUES");
-                }
+            ClickHouseEvent::SearchQueryEvent(event) => {
+                search_queries_inserter.write(event).await.map_err(|e| {
+                    log::error!("Error writing search query event: {:?}", e);
+                    ServiceError::InternalServerError(format!(
+                        "Error writing search query event: {:?}",
+                        e
+                    ))
+                })?;
             }
             ClickHouseEvent::RecommendationEvent(event) => {
-                recommendations_inserter.write(&event).await.map_err(|e| {
+                recommendations_inserter.write(event).await.map_err(|e| {
                     log::error!("Error writing recommendation event: {:?}", e);
                     ServiceError::InternalServerError(format!(
                         "Error writing recommendation event: {:?}",
@@ -103,7 +89,7 @@ pub async fn send_to_clickhouse(
                 })?;
             }
             ClickHouseEvent::RagQueryEvent(event) => {
-                rag_queries_inserter.write(&event).await.map_err(|e| {
+                rag_queries_inserter.write(event).await.map_err(|e| {
                     log::error!("Error writing rag query event: {:?}", e);
                     ServiceError::InternalServerError(format!(
                         "Error writing rag query event: {:?}",
@@ -112,7 +98,7 @@ pub async fn send_to_clickhouse(
                 })?;
             }
             ClickHouseEvent::WorkerEvent(event) => {
-                worker_events_inserter.write(&event).await.map_err(|e| {
+                worker_events_inserter.write(event).await.map_err(|e| {
                     log::error!("Error writing worker event: {:?}", e);
                     ServiceError::InternalServerError(format!(
                         "Error writing worker event: {:?}",
@@ -120,19 +106,109 @@ pub async fn send_to_clickhouse(
                     ))
                 })?;
             }
+            ClickHouseEvent::AnalyticsEvent(event) => {
+                analytics_events_inserter.write(event).await.map_err(|e| {
+                    log::error!("Error writing analytics event: {:?}", e);
+                    ServiceError::InternalServerError(format!(
+                        "Error writing analytics event: {:?}",
+                        e
+                    ))
+                })?;
+            }
+            ClickHouseEvent::RagQueryRatingEvent(event) => {
+                let mut rag_event = clickhouse_client
+                    .query("SELECT ?fields FROM rag_queries WHERE id = ?")
+                    .bind(event.query_id)
+                    .fetch_optional::<RagQueryEventClickhouse>()
+                    .await
+                    .map_err(|e| {
+                        log::error!("Error fetching query: {:?}", e);
+                        ServiceError::InternalServerError("Error fetching query".to_string())
+                    })?;
+
+                if rag_event.is_none() {
+                    rag_event = events
+                        .iter()
+                        .filter_map(|e| match e {
+                            ClickHouseEvent::RagQueryEvent(event) => Some(event.clone()),
+                            _ => None,
+                        })
+                        .find(|e| e.id == event.query_id);
+                }
+
+                let mut rag_event = if let Some(event) = rag_event {
+                    event
+                } else {
+                    continue;
+                };
+
+                let rating = SearchQueryRating {
+                    rating: event.rating,
+                    note: event.note.clone(),
+                    metadata: event.metadata.clone(),
+                };
+
+                rag_event.query_rating = serde_json::to_string(&rating).unwrap();
+                rag_queries_inserter.write(&rag_event).await.map_err(|e| {
+                    log::error!("Error writing rag query rating event: {:?}", e);
+                    ServiceError::InternalServerError(format!(
+                        "Error writing rag query rating event: {:?}",
+                        e
+                    ))
+                })?;
+            }
+            ClickHouseEvent::SearchQueryRatingEvent(event) => {
+                let mut search_event = clickhouse_client
+                    .query("SELECT ?fields FROM search_queries WHERE id = ?")
+                    .bind(event.query_id)
+                    .fetch_optional::<SearchQueryEventClickhouse>()
+                    .await
+                    .map_err(|e| {
+                        log::error!("Error fetching query: {:?}", e);
+                        ServiceError::InternalServerError("Error fetching query".to_string())
+                    })?;
+
+                let rating = SearchQueryRating {
+                    rating: event.rating,
+                    note: event.note.clone(),
+                    metadata: event.metadata.clone(),
+                };
+
+                if search_event.is_none() {
+                    search_event = events
+                        .iter()
+                        .filter_map(|e| match e {
+                            ClickHouseEvent::SearchQueryEvent(event) => Some(event.clone()),
+                            _ => None,
+                        })
+                        .find(|e| e.id == event.query_id);
+                }
+
+                let mut search_event = if let Some(event) = search_event {
+                    event
+                } else {
+                    continue;
+                };
+
+                search_event.query_rating = serde_json::to_string(&rating).unwrap();
+                search_queries_inserter
+                    .write(&search_event)
+                    .await
+                    .map_err(|e| {
+                        log::error!("Error writing search query rating event: {:?}", e);
+                        ServiceError::InternalServerError(format!(
+                            "Error writing search query rating event: {:?}",
+                            e
+                        ))
+                    })?;
+            }
         }
     }
 
-    if search_queries_inserter != *"INSERT INTO search_queries (id, search_type, query, request_params, query_vector, latency, top_score, results, dataset_id, created_at) VALUES" {
-        clickhouse_client
-            .query(&search_queries_inserter[..search_queries_inserter.len() - 1])
-            .execute()
-            .await
-            .map_err(|err| {
-                log::error!("Error writing to ClickHouse search_queries: {:?}", err);
-                ServiceError::InternalServerError("Error writing to ClickHouse search_queries".to_string())
-            })?;
-    }
+    search_queries_inserter.end().await.map_err(|e| {
+        log::error!("Error ending search queries inserter: {:?}", e);
+        ServiceError::InternalServerError(format!("Error ending search queries inserter: {:?}", e))
+    })?;
 
     rag_queries_inserter.end().await.map_err(|e| {
         log::error!("Error ending rag queries inserter: {:?}", e);
@@ -145,6 +221,13 @@ pub async fn send_to_clickhouse(
     worker_events_inserter.end().await.map_err(|e| {
         log::error!("Error ending worker events inserter: {:?}", e);
         ServiceError::InternalServerError(format!("Error ending worker events inserter: {:?}", e))
+    })?;
+    analytics_events_inserter.end().await.map_err(|e| {
+        log::error!("Error ending analytics events inserter: {:?}", e);
+        ServiceError::InternalServerError(format!(
+            "Error ending analytics events inserter: {:?}",
+            e
+        ))
     })?;
 
     Ok(())
@@ -176,7 +259,7 @@ impl EventQueue {
                 tokio::select! {
                     Some(event) = reciever.recv() => {
                         events.push(event);
-                        if Instant::now().0.duration_since(timer.0).as_secs() > 10 || events.len() > 1000 {
+                        if Instant::now().0.duration_since(timer.0).as_secs() > 10 || events.len() > 500 {
                             if let Err(e) = send_to_clickhouse(events.clone(), &clickhouse_client).await {
                                 log::error!("Error sending events to clickhouse: {:?}", e);
                             }

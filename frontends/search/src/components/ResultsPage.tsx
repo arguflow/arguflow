@@ -23,6 +23,7 @@ import {
   type ScoreChunkDTO,
   ChunkBookmarksDTO,
   GroupScoreChunkDTO,
+  isChunkGroupPageDTO,
 } from "../utils/apiTypes";
 import { FullScreenModal } from "./Atoms/FullScreenModal";
 import { PaginationController } from "./Atoms/PaginationController";
@@ -111,6 +112,7 @@ const ResultsPage = (props: ResultsPageProps) => {
 
   const [serverTimings, setServerTimings] = createSignal<ServerTiming[]>([]);
   const [showServerTimings, setShowServerTimings] = createSignal(false);
+  const [allGroupsList, setAllGroupsList] = createSignal<ChunkGroupDTO[]>([]);
 
   const fetchChunkCollections = () => {
     if (!$currentUser?.()) return;
@@ -201,6 +203,55 @@ const ResultsPage = (props: ResultsPageProps) => {
       }
     });
   };
+
+  const fetchAllGroups = async () => {
+    let currentPage = 1;
+    let hasMore = true;
+    const currentDataset = $dataset?.();
+    if (!currentDataset) return;
+
+    while (hasMore) {
+      const response = await fetch(
+        `${apiHost}/dataset/groups/${currentDataset.dataset.id}/${currentPage}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "X-API-version": "2.0",
+            "TR-Dataset": currentDataset.dataset.id,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (response.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const data = await response.json();
+        if (isChunkGroupPageDTO(data)) {
+          setAllGroupsList((prevGroups) => {
+            return [...prevGroups, ...data.groups];
+          });
+          hasMore = currentPage < data.total_pages && currentPage < 100;
+          currentPage++;
+        } else {
+          hasMore = false;
+        }
+      } else {
+        hasMore = false;
+      }
+
+      if (hasMore) {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+      }
+    }
+  };
+
+  createEffect(() => {
+    const currentDataset = $dataset?.();
+    if (!currentDataset) return;
+
+    void fetchAllGroups();
+  });
 
   createEffect(() => {
     fetchChunkCollections();
@@ -630,6 +681,7 @@ const ResultsPage = (props: ResultsPageProps) => {
                     <ScoreChunk
                       totalGroupPages={totalCollectionPages()}
                       chunkGroups={chunkCollections()}
+                      allGroupsList={allGroupsList()}
                       chunk={chunk.chunk}
                       score={chunk.score}
                       bookmarks={bookmarks()}
@@ -790,7 +842,12 @@ const ResultsPage = (props: ResultsPageProps) => {
                               </div>
                             </div>
                           </Show>
-                          <Show when={groupResult.group.tag_set?.length}>
+                          <Show
+                            when={
+                              groupResult.group.tag_set?.filter((tag) => tag)
+                                .length
+                            }
+                          >
                             <div class="flex w-full flex-row justify-between">
                               <div class="flex space-x-2">
                                 <span class="text-nowrap font-semibold text-neutral-800 dark:text-neutral-200">
@@ -907,6 +964,7 @@ const ResultsPage = (props: ResultsPageProps) => {
                           <div class="ml-5 flex space-y-4">
                             <ScoreChunk
                               totalGroupPages={totalCollectionPages()}
+                              allGroupsList={allGroupsList()}
                               chunkGroups={chunkCollections()}
                               chunk={chunk.chunk}
                               score={chunk.score}

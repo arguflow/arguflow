@@ -69,6 +69,7 @@ export const AfMessage = (props: AfMessageProps) => {
                     {(chunk, idx) => (
                       <ScoreChunk
                         group={undefined}
+                        allGroupsList={[]}
                         chunk={chunk.chunk}
                         score={0}
                         showExpand={!props.streamingCompletion()}

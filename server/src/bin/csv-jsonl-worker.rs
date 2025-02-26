@@ -460,8 +460,7 @@ async fn process_csv_jsonl_file(
                             create_chunk_metadata(
                                 chunk_req_payloads.clone(),
                                 csv_jsonl_worker_message.dataset_id,
-                            )
-                            .await?;
+                            )?;
 
                         if !upsert_chunk_metadatas.is_empty() {
                             log::info!(
@@ -492,8 +491,7 @@ async fn process_csv_jsonl_file(
         let (upsert_chunk_ingestion_message, upsert_chunk_metadatas) = create_chunk_metadata(
             chunk_req_payloads.clone(),
             csv_jsonl_worker_message.dataset_id,
-        )
-        .await?;
+        )?;
 
         if !upsert_chunk_metadatas.is_empty() {
             log::info!(

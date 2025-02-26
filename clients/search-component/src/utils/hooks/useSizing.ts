@@ -10,6 +10,8 @@ const popupClass = cva(
     "tv-top-[16px]", // mobile
     "tv-shadow-2xl tv-fixed",
     "tv-px-4",
+    "tv-left-[50%]",
+    "-tv-translate-x-[50%]",
     "md:tv-min-w-auto",
     "md:tv-w-[90vw]",
     "md:!tv-min-w-auto",
@@ -27,13 +29,6 @@ const popupClass = cva(
         search: [],
         chat: [],
       },
-      modalPosition: {
-        center: ["tv-left-[50%]", "-tv-translate-x-[50%]"],
-        right: ["tv-right-[0px]"],
-      },
-    },
-    defaultVariants: {
-      modalPosition: "center",
     },
   }
 );
@@ -68,7 +63,6 @@ export const useSizing = () => {
     return popupClass({
       type: props.type,
       mode: mode as "search" | "chat",
-      modalPosition: props.modalPosition,
     });
   }
 };

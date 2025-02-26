@@ -908,12 +908,10 @@ async fn send_chunks(
 
     for chunk_segment in chunk_segments {
         let (ingestion_message, chunk_metadatas) =
-            create_chunk_metadata(chunk_segment, dataset_org_plan_sub.dataset.id)
-                .await
-                .map_err(|e| {
-                    log::error!("Could not create chunk metadata {:?}", e);
-                    ServiceError::InternalServerError("Could not create chunk metadata".to_string())
-                })?;
+            create_chunk_metadata(chunk_segment, dataset_org_plan_sub.dataset.id).map_err(|e| {
+                log::error!("Could not create chunk metadata {:?}", e);
+                ServiceError::InternalServerError("Could not create chunk metadata".to_string())
+            })?;
 
         if chunk_metadatas.is_empty() {
             continue;

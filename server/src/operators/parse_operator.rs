@@ -97,7 +97,8 @@ pub fn coarse_doc_chunker(
 
     let pattern = match split_pattern {
         Some(pattern) => pattern,
-        None => Regex::new(r"[.!?\n]+").expect("Invalid regex"),
+        None => build_chunking_regex(vec![".".to_string(), "?".to_string(), "\\n".to_string()])
+            .expect("regex is always correct"),
     };
 
     let mut splits = pattern

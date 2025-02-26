@@ -28,12 +28,17 @@ export const FloatingActionButton = () => {
           setMode("chat");
         });
       }}
-      className="floating-action-button"
+      className={`floating-action-button${props.theme === "dark" ? " dark" : ""}`}
       style={{
         ...setButtonPosition(props.floatingButtonPosition || "bottom-right"),
+        zIndex: (props.zIndex ?? 1000) - 1,
       }}
     >
-      <SparklesIcon width={20} height={20} />
+      {props.brandLogoImgSrcUrl ? (
+        <img src={props.brandLogoImgSrcUrl} alt="Brand Logo" />
+      ) : (
+        <SparklesIcon width={20} height={20} />
+      )}
       Ask AI
     </button>
   );

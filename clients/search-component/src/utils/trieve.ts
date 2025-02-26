@@ -357,26 +357,47 @@ export const getSuggestedQuestions = async ({
   count,
   groupTrackingId,
   props: modalProps,
+  prevUserMessages,
+  is_followup,
+  chunks,
 }: {
   trieve: TrieveSDK;
   abortController?: AbortController;
   query?: string;
   count: number;
   groupTrackingId?: string | null;
+  is_followup?: boolean,
+  prevUserMessages?: string[],
   props?: ModalProps;
+  chunks?: Chunk[] | null,
 }) => {
+
+  let context: string;
+  if (groupTrackingId && modalProps?.cleanGroupName) {
+    context = `The user is specifically and exclusively interested in the ${modalProps.cleanGroupName}. Suggest short questions limited to 3-6 words based on the reference content.`;
+  } else if (prevUserMessages && is_followup && chunks) {
+    const cleanedChunks = chunks.map((chunk) => {
+      return {
+        chunk_html: chunk.chunk_html,
+        title: chunk.metadata.heading || chunk.metadata.title || chunk.metadata.page_title,
+        price: chunk.num_value
+      }
+    });
+    context = `The previous messages were ${JSON.stringify(prevUserMessages)}. The AI presented ${JSON.stringify(cleanedChunks)}. You are the user asking follow up questions to the AI. Keep your query recommendations short, limited to 3-6 words.`;
+  } else if (query) {
+    context = `The user's previous query was "${query}", all suggestions should look like that.`;
+  } else {
+    context = "Keep your query recommendations short, limited to 3-6 words";
+  }
+
   return trieve.suggestedQueries(
     {
       ...(query && { query }),
       suggestion_type: "question",
       search_type: "hybrid",
       suggestions_to_create: count,
-      context:
-        groupTrackingId && modalProps?.cleanGroupName
-          ? `The user is specifically and exclusively interested in the ${modalProps.cleanGroupName}. Suggest short questions limited to 3-6 words based on the reference content.`
-          : query
-            ? `The user's previous query was "${query}", all suggestions should look like that.`
-            : "Keep your query recommendations short, limited to 3-6 words",
+      is_followup: is_followup ?? false,
+      context,
       ...(groupTrackingId &&
         groupTrackingId && {
           filters: {

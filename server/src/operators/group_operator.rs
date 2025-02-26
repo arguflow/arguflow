@@ -188,34 +188,46 @@ pub async fn get_groups_for_dataset_query(
 
     let groups = chunk_group_columns::chunk_group
         .filter(chunk_group_columns::dataset_id.eq(dataset_uuid))
-        .left_join(
-            groups_from_files_columns::groups_from_files
-                .on(chunk_group_columns::id.eq(groups_from_files_columns::group_id)),
-        )
         .order_by(chunk_group_columns::id.desc())
         .offset(((page - 1) * 10).try_into().unwrap_or(0))
         .limit(10)
-        .select((
-            ChunkGroup::as_select(),
-            groups_from_files_columns::file_id.nullable(),
-        ))
-        .load::<(ChunkGroup, Option<uuid::Uuid>)>(&mut conn)
+        .load::<ChunkGroup>(&mut conn)
         .await
         .map_err(|_err| ServiceError::BadRequest("Error getting groups for dataset".to_string()))?;
 
+    let file_ids = groups_from_files_columns::groups_from_files
+        .filter(
+            groups_from_files_columns::group_id
+                .eq_any(groups.iter().map(|x| x.id).collect::<Vec<uuid::Uuid>>()),
+        )
+        .select((
+            groups_from_files_columns::group_id,
+            groups_from_files_columns::file_id,
+        ))
+        .load::<(uuid::Uuid, uuid::Uuid)>(&mut conn)
+        .await
+        .map_err(|_err| ServiceError::BadRequest("Error getting file ids".to_string()))?;
+
     let group_and_files = groups
         .into_iter()
-        .map(|(group, file_id)| ChunkGroupAndFileId {
-            id: group.id,
-            dataset_id: group.dataset_id,
-            name: group.name,
-            description: group.description,
-            tracking_id: group.tracking_id,
-            tag_set: group.tag_set,
-            metadata: group.metadata,
-            file_id,
-            created_at: group.created_at,
-            updated_at: group.updated_at,
+        .map(|group| {
+            let file_id = file_ids
+                .iter()
+                .find(|(group_id, _)| group.id == *group_id)
+                .map(|(_, file_id)| *file_id);
+
+            ChunkGroupAndFileId {
+                id: group.id,
+                dataset_id: group.dataset_id,
+                name: group.name,
+                description: group.description,
+                tracking_id: group.tracking_id,
+                tag_set: group.tag_set,
+                metadata: group.metadata,
+                file_id,
+                created_at: group.created_at,
+                updated_at: group.updated_at,
+            }
         })
         .collect();
 

@@ -56,7 +56,7 @@ export const GroupUserPageView = (props: GroupUserPageViewProps) => {
   const [searchQuery, setSearchQuery] = createSignal("");
   const [searchResults, setSearchResults] = createSignal<ChunkGroupDTO[]>([]);
 
-  const groupsList = createMemo(() => allGroups());
+  const allGroupsList = createMemo(() => allGroups());
 
   createEffect(() => {
     const currentDataset = $dataset?.();
@@ -108,7 +108,6 @@ export const GroupUserPageView = (props: GroupUserPageViewProps) => {
     if (!currentDataset) return;
 
     const fetchAllGroups = async () => {
-      const allGroupsArray: ChunkGroupDTO[] = [];
       let currentPage = 1;
       let hasMore = true;
 
@@ -130,8 +129,10 @@ export const GroupUserPageView = (props: GroupUserPageViewProps) => {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const data = await response.json();
           if (isChunkGroupPageDTO(data)) {
-            allGroupsArray.push(...data.groups);
-            hasMore = currentPage < data.total_pages;
+            setAllGroups((prevGroups) => {
+              return [...prevGroups, ...data.groups];
+            });
+            hasMore = currentPage < data.total_pages && currentPage < 100;
             currentPage++;
           } else {
             hasMore = false;
@@ -144,8 +145,6 @@ export const GroupUserPageView = (props: GroupUserPageViewProps) => {
           await new Promise((resolve) => setTimeout(resolve, 750));
         }
       }
-
-      setAllGroups(allGroupsArray);
     };
 
     void fetchAllGroups();
@@ -190,7 +189,7 @@ export const GroupUserPageView = (props: GroupUserPageViewProps) => {
   });
 
   createEffect(() => {
-    const groupListOrEmpty = groupsList() ?? [];
+    const groupListOrEmpty = allGroupsList() ?? [];
     if (searchQuery() === "") {
       setSearchResults(groups());
     } else {

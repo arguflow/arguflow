@@ -111,46 +111,6 @@ export const DatasetSettings = ({
           </Text>
 
           <FormLayout>
-            <Select
-              value={unsavedCrawlOptions.interval || "daily"}
-              options={["daily", "weekly", "monthly"] as CrawlInterval[]}
-              onChange={(option: CrawlInterval) => {
-                setUnsavedCrawlOptions({
-                  ...unsavedCrawlOptions,
-                  interval: option,
-                });
-              }}
-              label="Crawl Interval"
-            />
-
-            <Checkbox
-              label="Group Product Variants"
-              checked={
-                unsavedCrawlOptions.scrape_options?.group_variants || false
-              }
-              onChange={(e) => {
-                setUnsavedCrawlOptions({
-                  ...unsavedCrawlOptions,
-                  scrape_options: {
-                    ...unsavedCrawlOptions.scrape_options,
-                    group_variants: e,
-                    type: "shopify"
-                  },
-                });
-              }}
-            />
-
-            <Checkbox
-              label="Boost titles"
-              checked={unsavedCrawlOptions.boost_titles || false}
-              onChange={(e) => {
-                setUnsavedCrawlOptions({
-                  ...unsavedCrawlOptions,
-                  boost_titles: e,
-                });
-              }}
-            />
-
             <TextField
               autoComplete="off"
               label="Important Product Tags (Comma Seperated)"

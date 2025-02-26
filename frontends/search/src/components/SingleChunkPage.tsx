@@ -67,6 +67,7 @@ export const SingleChunkPage = (props: SingleChunkPageProps) => {
   const [scoreChunk, setScoreChunk] = createSignal<ScoreChunkDTO[]>([]);
   const [shouldPoll, setShouldPoll] = createSignal(true);
   const [pollingTrigger, setPollingTrigger] = createSignal(0);
+  const [allGroupsList, setAllGroupsList] = createSignal<ChunkGroupDTO[]>([]);
 
   const recentlyUploaded = searchParams.recently_uploaded === "true";
 
@@ -109,6 +110,55 @@ export const SingleChunkPage = (props: SingleChunkPageProps) => {
       }
     });
   };
+
+  const fetchAllGroups = async () => {
+    let currentPage = 1;
+    let hasMore = true;
+    const currentDataset = $dataset?.();
+    if (!currentDataset) return;
+
+    while (hasMore) {
+      const response = await fetch(
+        `${apiHost}/dataset/groups/${currentDataset.dataset.id}/${currentPage}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "X-API-version": "2.0",
+            "TR-Dataset": currentDataset.dataset.id,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (response.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const data = await response.json();
+        if (isChunkGroupPageDTO(data)) {
+          setAllGroupsList((prevGroups) => {
+            return [...prevGroups, ...data.groups];
+          });
+          hasMore = currentPage < data.total_pages && currentPage < 100;
+          currentPage++;
+        } else {
+          hasMore = false;
+        }
+      } else {
+        hasMore = false;
+      }
+
+      if (hasMore) {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+      }
+    }
+  };
+
+  createEffect(() => {
+    const currentDataset = $dataset?.();
+    if (!currentDataset) return;
+
+    void fetchAllGroups();
+  });
 
   const fetchBookmarks = () => {
     const currentDataset = $dataset?.();
@@ -233,6 +283,7 @@ export const SingleChunkPage = (props: SingleChunkPageProps) => {
 
     return (
       <ScoreChunk
+        allGroupsList={allGroupsList()}
         totalGroupPages={totalGroupPages()}
         chunk={curChunkMetadata}
         score={0}
@@ -323,6 +374,7 @@ export const SingleChunkPage = (props: SingleChunkPageProps) => {
                           setShowConfirmModal={setShowConfirmDeleteModal}
                           fetchChunkGroups={fetchChunkGroups}
                           setChunkGroups={setChunkGroups}
+                          allGroupsList={allGroupsList()}
                           setOnDelete={setOnDelete}
                           showExpand={true}
                           registerClickForChunk={({ id, eventType }) =>

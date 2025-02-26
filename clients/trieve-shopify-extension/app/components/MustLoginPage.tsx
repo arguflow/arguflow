@@ -1,5 +1,5 @@
-import { Card, BlockStack, Text, Box, Button, CalloutCard } from "@shopify/polaris";
-import { Link, useRevalidator } from "@remix-run/react";
+import { Box, CalloutCard } from "@shopify/polaris";
+import { useRevalidator } from "@remix-run/react";
 import { useEffect } from "react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 

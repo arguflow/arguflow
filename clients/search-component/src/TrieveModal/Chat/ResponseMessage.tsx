@@ -11,7 +11,6 @@ import {
 import { LoadingIcon, SparklesIcon } from "../icons";
 import { ChatPdfItem } from "../PdfView/ChatPdfItem";
 import { Carousel } from "./Carousel";
-import { FollowupQueries } from "./FollowupQueries";
 import { sendCtrData, trackViews } from "../../utils/trieve";
 import { motion } from "motion/react";
 import { ScoreChunk } from "trieve-ts-sdk";
@@ -26,7 +25,7 @@ export type Message = {
   additional: Chunk[] | null;
 };
 
-export const RepsonseMessage = ({
+export const ResponseMessage = ({
   message,
   idx,
 }: {
@@ -49,7 +48,7 @@ export const RepsonseMessage = ({
         className={
           props.inline
             ? ""
-            : "tv-col-span-2 tv-pr-4 sm:tv-grid sm:tv-grid-cols-[48px,1fr] tv-gap-2"
+            : "sm:tv-col-span-2 tv-pr-4 tv-grid tv-grid-cols-[1fr] sm:tv-grid-cols-[48px,1fr] tv-gap-2"
         }
         key={idx}
       >
@@ -91,7 +90,7 @@ export const Message = ({
 }) => {
   const urlWordRegex = /(?:^|\s)http\S+\s*/g;
 
-  const { rateChatCompletion, messages } = useChatState();
+  const { rateChatCompletion } = useChatState();
   const [positive, setPositive] = React.useState<boolean | null>(null);
   const [copied, setCopied] = React.useState<boolean>(false);
   const { props, trieveSDK } = useModalState();
@@ -105,7 +104,7 @@ export const Message = ({
             chunk.metadata.page_title) &&
           chunk.link &&
           chunk.image_urls?.length &&
-          chunk.num_value,
+          chunk.num_value
       );
       if (ecommerceChunks && message.queryId) {
         trackViews({
@@ -128,7 +127,7 @@ export const Message = ({
           chunk.metadata.page_title) &&
         chunk.link &&
         chunk.image_urls?.length &&
-        chunk.num_value,
+        chunk.num_value
     )
     .map((chunk) => ({
       chunk,
@@ -146,7 +145,7 @@ export const Message = ({
     .filter(
       (item, index, array) =>
         array.findIndex((arrayItem) => arrayItem.title === item.title) ===
-          index && item.title,
+          index && item.title
     )
     .map((item, index) => {
       const { title, descriptionHtml } = guessTitleAndDesc(item);
@@ -184,29 +183,31 @@ export const Message = ({
                   ? title
                   : title.replace(
                       /<mark>|<\/mark>|<span class="highlight">|<\/span>/g,
-                      "",
+                      ""
                     ),
               }}
             />
-            <p
-              className="ecomm-item-price"
-              style={{
-                color: props.brandColor ?? "#CB53EB",
-              }}
-            >
-              ${item.price}
-            </p>
-            <p
-              className="ecom-item-description"
-              dangerouslySetInnerHTML={{
-                __html: props.showResultHighlights
-                  ? descriptionHtml
-                  : descriptionHtml.replace(
-                      /<mark>|<\/mark>|<span class="highlight">|<\/span>/g,
-                      "",
-                    ),
-              }}
-            />
+            {!props.hidePrice &&
+              <p
+                className="ecomm-item-price"
+                style={{
+                  color: props.brandColor ?? "#CB53EB",
+                }}
+              >
+                ${item.price}
+              </p>}
+            {!props.hideChunkHtml &&
+              <p
+                className="ecom-item-description"
+                dangerouslySetInnerHTML={{
+                  __html: props.showResultHighlights
+                    ? descriptionHtml
+                    : descriptionHtml.replace(
+                        /<mark>|<\/mark>|<span class="highlight">|<\/span>/g,
+                        ""
+                      ),
+                }}
+              />}
           </div>
           <div className="tv-w-full mt-auto tv-justify-self-end">
             <AddToCartButton item={item} />
@@ -228,7 +229,7 @@ export const Message = ({
           chunk.metadata.title ||
           chunk.metadata.page_title) &&
         chunk.link &&
-        chunk.metadata.yt_preview_src,
+        chunk.metadata.yt_preview_src
     )
     .map((chunk) => {
       return {
@@ -261,7 +262,7 @@ export const Message = ({
       const chunkHtmlHeadingsDiv = document.createElement("div");
       chunkHtmlHeadingsDiv.innerHTML = chunk.chunk_html || "";
       const chunkHtmlHeadings = chunkHtmlHeadingsDiv.querySelectorAll(
-        "h1, h2, h3, h4, h5, h6",
+        "h1, h2, h3, h4, h5, h6"
       );
       const $firstHeading =
         chunkHtmlHeadings[0] ?? document.createElement("h1");
@@ -287,8 +288,7 @@ export const Message = ({
     .filter((chunk) => chunk.link && !chunk.metadata.yt_preview_src)
     .filter(
       (item, index, array) =>
-        array.findIndex((arrayItem) => arrayItem.title === item.title) ===
-        index,
+        array.findIndex((arrayItem) => arrayItem.title === item.title) === index
     )
     .map((item, index) => (
       <a
@@ -304,7 +304,8 @@ export const Message = ({
         ) : (
           <></>
         )}
-        {item.title}
+        {item.title}{" "}
+        <i className="fa-solid fa-up-right-from-square tv-pl-1"></i>
       </a>
     ));
 
@@ -401,7 +402,6 @@ export const Message = ({
                   </button>
                 )}
                 <button
-                  className={positive != null && positive ? "icon-darken" : ""}
                   onClick={() => {
                     rateChatCompletion(true, message.queryId);
                     setPositive((prev) => {
@@ -410,10 +410,22 @@ export const Message = ({
                     });
                   }}
                 >
-                  <i className="fa-regular fa-thumbs-up"></i>
+                  <div
+                    style={{
+                      display: positive ? "block" : "none",
+                    }}
+                  >
+                    <i className="fa-solid fa-thumbs-up"></i>
+                  </div>
+                  <div
+                    style={{
+                      display: !positive ? "block" : "none",
+                    }}
+                  >
+                    <i className="fa-regular fa-thumbs-up"></i>
+                  </div>
                 </button>
                 <button
-                  className={positive != null && !positive ? "icon-darken" : ""}
                   onClick={() => {
                     rateChatCompletion(false, message.queryId);
                     setPositive((prev) => {
@@ -422,13 +434,23 @@ export const Message = ({
                     });
                   }}
                 >
-                  <i className="fa-regular fa-thumbs-down"></i>
+                  <div
+                    style={{
+                      display: positive != null && !positive ? "block" : "none",
+                    }}
+                  >
+                    <i className="fa-solid fa-thumbs-down"></i>
+                  </div>
+                  <div
+                    style={{
+                      display: positive == null || positive ? "block" : "none",
+                    }}
+                  >
+                    <i className="fa-regular fa-thumbs-down"></i>
+                  </div>
                 </button>
               </div>
             </div>
-            {props.followupQuestions && messages.length == idx + 1 && (
-              <FollowupQueries />
-            )}
           </div>
         </div>
       ) : null}

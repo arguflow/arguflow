@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "8765d78a52aa8c12ae2d235d9d41529c"
-application_url = "https://ii-sean-concentration-frankfurt.trycloudflare.com"
+application_url = "https://control-danger-martial-scanning.trycloudflare.com"
 embedded = true
 name = "trieve-search-extension"
 handle = "trieve-search-extension"
@@ -23,9 +23,9 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://ii-sean-concentration-frankfurt.trycloudflare.com/auth/callback",
-  "https://ii-sean-concentration-frankfurt.trycloudflare.com/auth/shopify/callback",
-  "https://ii-sean-concentration-frankfurt.trycloudflare.com/api/auth/callback"
+  "https://control-danger-martial-scanning.trycloudflare.com/auth/callback",
+  "https://control-danger-martial-scanning.trycloudflare.com/auth/shopify/callback",
+  "https://control-danger-martial-scanning.trycloudflare.com/api/auth/callback"
 ]
 
 [pos]

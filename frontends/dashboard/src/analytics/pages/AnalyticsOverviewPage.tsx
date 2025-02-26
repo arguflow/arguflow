@@ -8,6 +8,8 @@ import { DateRangeFilter } from "shared/types";
 import { createSignal } from "solid-js";
 import { DateRangePicker } from "shared/ui";
 import { Granularity } from "trieve-ts-sdk";
+import { SearchMetrics } from "../components/charts/SearchMetrics";
+import { RagMetrics } from "../components/charts/RagMetrics";
 
 export const AnalyticsOverviewPage = () => {
   const [rpsDateRange, setRpsDateRange] = createSignal<DateRangeFilter>({
@@ -29,6 +31,12 @@ export const AnalyticsOverviewPage = () => {
         </div>
         <Card class="flex flex-col justify-between px-4" width={2}>
           <QueryCounts />
+        </Card>
+        <Card class="flex flex-col justify-between px-4" width={2}>
+          <SearchMetrics />
+        </Card>
+        <Card class="flex flex-col justify-between px-4" width={2}>
+          <RagMetrics />
         </Card>
         <Card
           title="Requests Per Second"
