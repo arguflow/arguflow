@@ -1851,6 +1851,34 @@ const SearchForm = (props: {
                 />
               </div>
             </Show>
+            {/* New Task Definition textbox in the dashboard for AIMon reranker
+            <Show
+              when={
+                rerankTypes().find(
+                  (type) => type.value === "cross_encoder" && type.isSelected
+                )
+              }
+            >
+              <div class="flex items-center space-x-2 mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-white">
+                  Task Definition (for AIMon reranker):
+                </label>
+                <input
+                  type="text"
+                  class="w-[700px] h-10 rounded border border-neutral-400 p-2.5 text-black"
+                  value={
+                    tempSearchValues().taskDefinition ||
+                    "Your task is to grade the relevance of context document(s) against the specified user query."
+                  }
+                  onInput={(e) => {
+                    setTempSearchValues((prev) => ({
+                      ...prev,
+                      taskDefinition: e.currentTarget.value,
+                    }));
+                  }}
+                />
+              </div>
+            </Show> */}
           </div>
         </form>
       </div>

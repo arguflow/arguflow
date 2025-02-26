@@ -149,11 +149,11 @@ export const GeneralServerSettings = (props: {
                   for="rerankerApiKey"
                   class="block text-sm font-medium leading-6"
                 >
-                  Cohere API Key (for reranker)
+                  API Key (for either the AIMon reranker or the Cohere reranker)
                 </label>
                 <Tooltip
                   body={<AiOutlineInfoCircle />}
-                  tooltipText="Sets the API key for the Cohere reranker if you choose to use it."
+                  tooltipText="Sets the API key for either the AIMon reranker or the Cohere reranker, whichever is selected."
                 />
               </div>
               <input
@@ -207,6 +207,42 @@ export const GeneralServerSettings = (props: {
                 </For>
               </select>
             </div>
+            {/* Task Definition textbox: Only if RERANKER_MODEL_NAME is "aimon-rerank" */}
+            {props.serverConfig().RERANKER_MODEL_NAME === "aimon-rerank" && (
+              <div class="col-span-4 space-y-1 sm:col-span-2">
+                <div class="flex items-center">
+                  <label
+                    for="taskDefinition"
+                    class="mr-2 block text-sm font-medium leading-6"
+                  >
+                    Task Definition (for AIMon reranker)
+                  </label>
+                  <Tooltip
+                    body={<AiOutlineInfoCircle />}
+                    tooltipText="Task definition can be used to specify the domain of the context documents for AIMon reranker."
+                  />
+                </div>
+                <textarea
+                  name="taskDefinition"
+                  id="taskDefinition"
+                  class="block w-full rounded-md border-[0.5px] border-neutral-300 px-3 py-1.5 shadow-sm placeholder:text-neutral-400 focus:outline-magenta-500 sm:text-sm sm:leading-6"
+                  value={
+                    props.serverConfig().TASK_DEFINITION ||
+                    "Your task is to grade the relevance of context document(s) against the specified user query."
+                  }
+                  onInput={(e) =>
+                    props.setServerConfig((prev) => {
+                      return {
+                        ...prev,
+                        TASK_DEFINITION: e.currentTarget.value,
+                      };
+                    })
+                  }
+                  placeholder="Task definition can be used to specify the domain of the context documents for AIMon reranker."
+                />
+              </div>
+            )}
+
           </div>
         </div>
       </div>
