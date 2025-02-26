@@ -17,38 +17,55 @@ import {
   Button,
   InlineStack,
 } from "@shopify/polaris";
-import { validateTrieveAuth } from "app/auth";
-
-export const clientLoader = async (args: ClientLoaderFunctionArgs) => {
-  try {
-    const key = await args.serverLoader<typeof loader>();
-    if (!key) {
-      throw json({ message: "No Key" }, 401);
-    }
-    const datasetsResponse = await fetch(
-      `https://api.trieve.ai/api/dataset/organization/${key.organizationId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${key.key}`,
-          "TR-Organization": key.organizationId ?? "",
-        },
-      },
-    );
-    const datasets = await datasetsResponse.json();
-    return datasets;
-  } catch (e) {
-    if (e instanceof Error && e.message != "No Key") {
-      throw json({ message: e.message }, 401);
-    }
-    throw json({ message: "No Key" }, 401);
-  }
-};
-
-clientLoader.hydrate = true;
+import { initTrieveSdk, validateTrieveAuth } from "app/auth";
+import { authenticate } from "app/shopify.server";
 
 export const loader = async (args: LoaderFunctionArgs) => {
+  const { session, sessionToken } = await authenticate.admin(args.request);
   const key = await validateTrieveAuth(args);
-  return key;
+  const trieve = await initTrieveSdk(args);
+
+  if (!trieve.organizationId) {
+    throw new Response("Unautorized, no organization tied to user session", {
+      status: 401,
+    });
+  }
+
+  let datasetId = trieve.datasetId;
+
+  const datasets = await trieve.getDatasetsFromOrganization(
+    trieve.organizationId,
+  );
+
+  let shopDataset = datasets.find(
+    (d) => d.dataset.id == trieve.datasetId,
+  )?.dataset;
+
+  if (!datasetId && trieve.organizationId) {
+    if (!shopDataset) {
+      shopDataset = await trieve.createDataset({
+        dataset_name: session.shop,
+      });
+
+      await prisma.apiKey.update({
+        data: {
+          currentDatasetId: shopDataset.id,
+        },
+        where: {
+          userId_shop: {
+            userId: sessionToken.sub as string,
+            shop: `https://${session.shop}`,
+          },
+        },
+      });
+    }
+    datasetId = shopDataset?.id;
+  }
+
+  return {
+    datasets,
+    shopDataset,
+  };
 };
 
 export function HydrateFallback() {
@@ -75,9 +92,7 @@ export function HydrateFallback() {
 }
 
 export default function Index() {
-  const datasets = useLoaderData<typeof clientLoader>();
-
-  let chosenDataset = datasets[0].dataset;
+  const { datasets, shopDataset } = useLoaderData<typeof loader>();
 
   return (
     <Page>
@@ -88,13 +103,11 @@ export default function Index() {
               <Card>
                 <InlineStack gap="200" align="space-between">
                   <Text as="h2" variant="headingMd">
-                    Indexed Dataset: {chosenDataset.name}
+                    Indexed Dataset: {shopDataset?.name}
                   </Text>
 
                   <Link to="/app/dataset">
-                    <Button>
-                      Edit settings
-                    </Button>
+                    <Button>Edit settings</Button>
                   </Link>
                 </InlineStack>
               </Card>

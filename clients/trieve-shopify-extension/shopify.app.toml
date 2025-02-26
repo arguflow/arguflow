@@ -1,7 +1,8 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
+
 client_id = "8765d78a52aa8c12ae2d235d9d41529c"
-application_url = "https://control-danger-martial-scanning.trycloudflare.com"
+application_url = "https://course-designers-celtic-shuttle.trycloudflare.com"
 embedded = true
 name = "trieve-search-extension"
 handle = "trieve-search-extension"
@@ -9,23 +10,35 @@ handle = "trieve-search-extension"
 [webhooks]
 api_version = "2025-01"
 
-  [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "/webhooks/app/scopes_update"
 
-  [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "/webhooks/app/uninstalled"
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "/webhooks/app/uninstalled"
+
+[[webhooks.subscriptions]]
+topics = ["products/create"]
+uri = "/webhooks/app/products/create"
+
+[[webhooks.subscriptions]]
+topics = ["products/update"]
+uri = "/webhooks/app/products/update"
+
+[[webhooks.subscriptions]]
+topics = ["products/delete"]
+uri = "/webhooks/app/products/delete"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
+scopes = "write_products,read_products"
 
 [auth]
 redirect_urls = [
-  "https://control-danger-martial-scanning.trycloudflare.com/auth/callback",
-  "https://control-danger-martial-scanning.trycloudflare.com/auth/shopify/callback",
-  "https://control-danger-martial-scanning.trycloudflare.com/api/auth/callback"
+  "https://course-designers-celtic-shuttle.trycloudflare.com/auth/callback",
+  "https://course-designers-celtic-shuttle.trycloudflare.com/auth/shopify/callback",
+  "https://course-designers-celtic-shuttle.trycloudflare.com/api/auth/callback",
 ]
 
 [pos]
@@ -34,3 +47,4 @@ embedded = false
 [build]
 automatically_update_urls_on_dev = true
 dev_store_url = "trieveai.myshopify.com"
+include_config_on_deploy = true

@@ -1,4 +1,4 @@
-import {  useSubmit } from "@remix-run/react";
+import { useSubmit } from "@remix-run/react";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import {
   BlockStack,
@@ -12,13 +12,19 @@ import {
   TextField,
 } from "@shopify/polaris";
 import { useEffect, useState } from "react";
-import { CrawlInterval, CrawlOptions, DatasetAndUsage } from "trieve-ts-sdk";
+import {
+  CrawlInterval,
+  CrawlOptions,
+  Dataset,
+  DatasetAndUsage,
+  DatasetDTO,
+} from "trieve-ts-sdk";
 
-export type ExtendedCrawlOptions = CrawlOptions & {
-  include_metafields?: string[],
+export type ExtendedCrawlOptions = Omit<CrawlOptions, "webhook_metadata"> & {
+  include_metafields?: string[];
   scrape_options: {
-    type: "shopify"
-  }
+    type: "shopify";
+  };
 };
 
 export const defaultCrawlOptions: ExtendedCrawlOptions = {
@@ -35,11 +41,15 @@ export const defaultCrawlOptions: ExtendedCrawlOptions = {
 export const DatasetSettings = ({
   initalCrawlOptions,
   datasets,
-  currentDatasetUsage
+  shopDataset,
+  userId,
+  shop,
 }: {
   initalCrawlOptions: ExtendedCrawlOptions;
   datasets: DatasetAndUsage[];
-  currentDatasetUsage: DatasetAndUsage;
+  shopDataset: Dataset;
+  userId: string;
+  shop: string;
 }) => {
   const [unsavedCrawlOptions, setUnsavedCrawlOptions] =
     useState(initalCrawlOptions);
@@ -55,7 +65,7 @@ export const DatasetSettings = ({
         ...unsavedCrawlOptions.scrape_options,
         group_variants: true,
         tag_regexes: [],
-        type: "shopify"
+        type: "shopify",
       },
     });
 
@@ -69,7 +79,10 @@ export const DatasetSettings = ({
 
   const onSave = async () => {
     submit(
-      { crawl_options: JSON.stringify(unsavedCrawlOptions), dataset_id: currentDatasetUsage.dataset.id },
+      {
+        crawl_options: JSON.stringify(unsavedCrawlOptions),
+        dataset_id: shopDataset.id,
+      },
       {
         method: "POST",
       },
@@ -78,15 +91,30 @@ export const DatasetSettings = ({
     shopify.toast.show("Started crawl!");
   };
 
-  const updateDefaultDataset = async (datasetId: string) => {
+  const updateDefaultDataset = async (
+    datasetId: string,
+    userId: string,
+    shop: string,
+  ) => {
     const dataset = datasets.find((d) => d.dataset.id == datasetId);
-    shopify.toast.show(`TODO need to update Dataset changed to ${dataset?.dataset.name}`);
-    // TODO unfinished
+    shopify.toast.show(`Indexed Dataset changed to ${dataset?.dataset.name}`);
+
+    prisma.apiKey.update({
+      data: {
+        currentDatasetId: shopDataset.id,
+      },
+      where: {
+        userId_shop: {
+          userId,
+          shop,
+        },
+      },
+    });
   };
 
   return (
     <BlockStack gap="200">
-      {datasets.length > 1 &&
+      {datasets.length > 1 && (
         <Card>
           <Text variant="headingLg" as="h1">
             Index Settings
@@ -95,14 +123,15 @@ export const DatasetSettings = ({
           <Select
             label="Dataset Index"
             onChange={(dataset) => {
-              updateDefaultDataset(dataset);
+              updateDefaultDataset(dataset, userId, shop);
             }}
-            value={currentDatasetUsage.dataset.id}
+            value={shopDataset.id}
             options={datasets.map((dataset) => {
-              return { label: dataset.dataset.name, value: dataset.dataset.id }
+              return { label: dataset.dataset.name, value: dataset.dataset.id };
             })}
           />
-        </Card>}
+        </Card>
+      )}
 
       <Card>
         <BlockStack gap="200">
@@ -124,7 +153,7 @@ export const DatasetSettings = ({
                   scrape_options: {
                     ...unsavedCrawlOptions.scrape_options,
                     tag_regexes: e.split(",").map((s) => s.trim()),
-                    type: "shopify"
+                    type: "shopify",
                   },
                 });
               }}

@@ -9,9 +9,10 @@ import {
 } from "app/components/CrawlSettings";
 import { sendChunks } from "app/processors/getProducts";
 import { authenticate } from "app/shopify.server";
-import { CrawlRequest } from "trieve-ts-sdk";
+import { CrawlRequest, type Dataset } from "trieve-ts-sdk";
 
 export const loader = async (args: LoaderFunctionArgs) => {
+  const { session, sessionToken } = await authenticate.admin(args.request);
   const trieve = await initTrieveSdk(args);
 
   if (!trieve.organizationId) {
@@ -23,30 +24,50 @@ export const loader = async (args: LoaderFunctionArgs) => {
   const datasets = await trieve.getDatasetsFromOrganization(
     trieve.organizationId,
   );
+
   let datasetId = trieve.datasetId;
+
+  let shopDataset = datasets.find(
+    (d) => d.dataset.id == trieve.datasetId,
+  )?.dataset;
+
   if (!datasetId && trieve.organizationId) {
-    datasetId = datasets[0].dataset.id;
+    if (!shopDataset) {
+      shopDataset = await trieve.createDataset({
+        dataset_name: session.shop,
+      });
+
+      await prisma.apiKey.update({
+        data: {
+          currentDatasetId: shopDataset.id,
+        },
+        where: {
+          userId_shop: {
+            userId: sessionToken.sub as string,
+            shop: session.shop,
+          },
+        },
+      });
+    }
+    datasetId = shopDataset?.id;
   }
+
   if (!datasetId) {
     throw new Response("Error choosing default dataset, need to create one", {
       status: 500,
     });
   }
-  let datasetUsage = datasets.find((d) => datasetId == d.dataset.id);
-  if (!datasetUsage) {
-    throw new Response("Error choosing default dataset from datasetId", {
-      status: 500,
-    });
-  }
 
-  trieve.datasetId = datasetUsage?.dataset.id;
+  trieve.datasetId = datasetId;
   const scrapingOptions = (await trieve.trieve.fetch("/api/crawl", "get", {
     datasetId: datasetId,
   })) as unknown as CrawlRequest[];
 
   return {
-    datasets: datasets,
-    currentDatasetUsage: datasetUsage,
+    userId: sessionToken.sub as string,
+    shop: session.shop,
+    shopDataset,
+    datasets,
     crawlOptions: scrapingOptions[0],
   };
 };
@@ -62,6 +83,23 @@ export const action = async (data: LoaderFunctionArgs) => {
     ) as ExtendedCrawlOptions) ?? defaultCrawlOptions;
   const datasetId = formData.get("dataset_id") as string;
 
+  await prisma.crawlSettings.upsert({
+    create: {
+      datasetId,
+      shop: session.shop,
+      crawlSettings: crawlOptions,
+    },
+    update: {
+      crawlSettings: crawlOptions,
+    },
+    where: {
+      datasetId_shop: {
+        datasetId,
+        shop: session.shop,
+      },
+    },
+  });
+
   sendChunks(datasetId ?? "", trieveKey, admin, session, crawlOptions).catch(
     console.error,
   );
@@ -69,7 +107,7 @@ export const action = async (data: LoaderFunctionArgs) => {
 };
 
 export default function Dataset() {
-  const { currentDatasetUsage, crawlOptions, datasets } =
+  const { userId, shop, shopDataset, datasets, crawlOptions } =
     useLoaderData<typeof loader>();
 
   return (
@@ -80,7 +118,7 @@ export default function Dataset() {
         </Box>
       </Link>
       <Text variant="headingXl" as="h2">
-        {currentDatasetUsage?.dataset.name}
+        {shopDataset?.name}
       </Text>
       <Box paddingBlockStart="400">
         <DatasetSettings
@@ -88,7 +126,9 @@ export default function Dataset() {
             crawlOptions?.crawl_options || defaultCrawlOptions
           }
           datasets={datasets}
-          currentDatasetUsage={currentDatasetUsage}
+          shopDataset={shopDataset as Dataset}
+          userId={userId}
+          shop={shop}
         />
       </Box>
     </Page>

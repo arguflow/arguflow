@@ -48,6 +48,7 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
       data: {
         userId: decoded.sub ?? "",
         organizationId: orgId.toString(),
+        shop: decoded.dest ?? "",
         key: apiKey.toString(),
         createdAt: new Date(),
       },
@@ -140,8 +141,7 @@ export default function App() {
               onClick={() => {
                 generateApiKey(org.id);
               }}
-              className="flex cursor-pointer items-center justify-between rounded-md border-b border-b-neutral-200 p-2 last:border-b-transparent hover:bg-neutral-100"
-            >
+              className="flex cursor-pointer items-center justify-between rounded-md border-b border-b-neutral-200 p-2 last:border-b-transparent hover:bg-neutral-100">
               <div className="flex w-full items-center justify-between">
                 <div className="text-sm font-medium">{org.name}</div>
                 <div className="text-xs text-neutral-500">{org.id}</div>
