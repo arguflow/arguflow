@@ -23,6 +23,7 @@ export type DatasetConfig = Exclude<
     enabled: boolean;
     api_key: string;
   };
+  TASK_DEFINITION?: string | null;    // Optional Task Definition added
 };
 
 type SettingsPage = (args: {

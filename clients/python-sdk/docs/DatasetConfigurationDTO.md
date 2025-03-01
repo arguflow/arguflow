@@ -38,6 +38,8 @@ Name | Type | Description | Notes
 **system_prompt** | **str** | The system prompt to use for the LLM | [optional] 
 **temperature** | **float** | The temperature to use | [optional] 
 **use_message_to_query_prompt** | **bool** | Whether to use the message to query prompt | [optional] 
+**task_definition** | **string** | A statement to specify the domain of the context documents for AIMon reranker model. | [optional] 
+
 
 ## Example
 
