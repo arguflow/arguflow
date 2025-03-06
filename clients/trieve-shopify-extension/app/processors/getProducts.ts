@@ -361,6 +361,7 @@ export const sendChunks = async (
             bodyHtml
             handle
             tags
+            status
             category {
               name
             }
@@ -400,8 +401,9 @@ export const sendChunks = async (
 
     const { data } = (await response.json()) as { data: ProductsResponse };
 
-    const dataChunks: ChunkReqPayload[] = data.products.nodes.flatMap(
-      (product) =>
+    const dataChunks: ChunkReqPayload[] = data.products.nodes
+      .filter((node) => node.status == "ACTIVE")
+      .flatMap((product) =>
         product.variants.nodes.map((variant) =>
           createChunkFromProduct(
             product,
@@ -410,7 +412,7 @@ export const sendChunks = async (
             crawlOptions,
           ),
         ),
-    );
+      );
 
     for (const batch of chunk_to_size(dataChunks, 120)) {
       sendChunksToTrieve(batch, key, datasetId ?? "");

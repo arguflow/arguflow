@@ -22,6 +22,7 @@
     "./clients/ts-sdk",
     "./clients/search-component"
   ],
+  "prettier.trailingComma": "all",
   "vitest.disableWorkspaceWarning": true,
   "typescript.tsdk": "node_modules/typescript/lib"
 }

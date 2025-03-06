@@ -1400,6 +1400,7 @@ pub async fn get_topic_string(
         )),
         name: None,
     };
+    let dataset_config = DatasetConfiguration::from_json(dataset.server_configuration.clone());
     let parameters = ChatCompletionParameters {
         model,
         messages: vec![prompt_topic_message],
@@ -1408,8 +1409,8 @@ pub async fn get_topic_string(
         top_p: None,
         n: None,
         stop: None,
-        presence_penalty: Some(0.8),
-        frequency_penalty: Some(0.8),
+        frequency_penalty: Some(dataset_config.FREQUENCY_PENALTY.unwrap_or(0.8) as f32),
+        presence_penalty: Some(dataset_config.PRESENCE_PENALTY.unwrap_or(0.8) as f32),
         logit_bias: None,
         user: None,
         response_format: None,
@@ -1421,7 +1422,6 @@ pub async fn get_topic_string(
         ..Default::default()
     };
 
-    let dataset_config = DatasetConfiguration::from_json(dataset.server_configuration.clone());
     let base_url = dataset_config.LLM_BASE_URL.clone();
 
     let base_url = if base_url.is_empty() {
@@ -1441,11 +1441,9 @@ pub async fn get_topic_string(
         organization: None,
     };
 
-    let query = client
-        .chat()
-        .create(parameters)
-        .await
-        .map_err(|_| ServiceError::BadRequest("No LLM Completion for topic".to_string()))?;
+    let query = client.chat().create(parameters).await.map_err(|err| {
+        ServiceError::BadRequest(format!("No LLM Completion for topic {:?}", err))
+    })?;
 
     let topic = match &query
         .choices
@@ -1527,8 +1525,8 @@ pub async fn get_text_from_image(
         top_p: None,
         n: None,
         stop: None,
-        presence_penalty: Some(0.8),
-        frequency_penalty: Some(0.8),
+        frequency_penalty: Some(dataset_config.FREQUENCY_PENALTY.unwrap_or(0.8) as f32),
+        presence_penalty: Some(dataset_config.PRESENCE_PENALTY.unwrap_or(0.8) as f32),
         logit_bias: None,
         user: None,
         response_format: None,
@@ -1671,8 +1669,8 @@ pub async fn suggested_followp_questions(
         n: None,
         stop: None,
         max_completion_tokens: None,
-        presence_penalty: Some(0.8),
-        frequency_penalty: Some(0.8),
+        frequency_penalty: Some(dataset_config.FREQUENCY_PENALTY.unwrap_or(0.8) as f32),
+        presence_penalty: Some(dataset_config.PRESENCE_PENALTY.unwrap_or(0.8) as f32),
         logit_bias: None,
         user: None,
         response_format: None,
@@ -1826,7 +1824,7 @@ pub async fn suggested_new_queries(
                         10,
                         Some(chunk.qdrant_point_id),
                         None,
-                        dataset_config,
+                        dataset_config.clone(),
                         filter,
                     )
                     .await?;
@@ -1910,8 +1908,8 @@ pub async fn suggested_new_queries(
         n: None,
         stop: None,
         max_completion_tokens: None,
-        presence_penalty: Some(0.8),
-        frequency_penalty: Some(0.8),
+        frequency_penalty: Some(dataset_config.clone().FREQUENCY_PENALTY.unwrap_or(0.8) as f32),
+        presence_penalty: Some(dataset_config.clone().PRESENCE_PENALTY.unwrap_or(0.8) as f32),
         logit_bias: None,
         user: None,
         response_format: None,

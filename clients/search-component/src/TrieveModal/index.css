@@ -582,7 +582,7 @@ body {
         @apply tv-p-2 tv-text-left tv-rounded-md tv-border tv-transition-all tv-border-solid;
         border-color: var(--tv-zinc-200) !important;
         border: 1px solid var(--tv-zinc-200);
-        
+
         &:hover {
           background-color: var(--tv-zinc-200);
         }
@@ -657,7 +657,7 @@ body {
       }
 
       .chunk-path {
-        @apply tv-text-xs tv-line-clamp-1 tv-overflow-ellipsis tv-text-zinc-600;
+        @apply tv-text-xs tv-line-clamp-1 tv-overflow-ellipsis tv-text-zinc-600 tv-mb-[1px];
       }
 
       .chunk-title {
@@ -682,7 +682,7 @@ body {
 
       .delete-method {
         @apply tv-text-xs tv-bg-red-900 tv-px-1 tv-py-0.5 tv-rounded-md tv-text-red-400 tv-mr-1;
-      } 
+      }
 
       .put-method {
         @apply tv-text-xs tv-bg-yellow-900 tv-px-1 tv-py-0.5 tv-rounded-md tv-text-yellow-400 tv-mr-1;

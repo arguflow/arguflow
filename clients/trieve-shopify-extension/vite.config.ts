@@ -51,7 +51,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: [
         (process.env.TRIEVE_AUTH_URL || env.TRIEVE_AUTH_URL)!.replace(
           "https://",
-          "",
+          ""
         ),
       ],
     },
@@ -71,6 +71,30 @@ export default defineConfig(({ mode }) => {
     ],
     build: {
       assetsInlineLimit: 0,
+    },
+    ssr: {
+      noExternal: [
+        "@shopify/polaris-viz",
+        "@juggle/resize-observer",
+        "@react-spring/animated",
+        "@react-spring/core",
+        "@react-spring/shared",
+        "@react-spring/types",
+        "@react-spring/web",
+        "@shopify/polaris-viz",
+        "@shopify/polaris-viz-core",
+        "d3-array",
+        "d3-color",
+        "d3-format",
+        "d3-interpolate",
+        "d3-path",
+        "d3-scale",
+        "d3-shape",
+        "d3-time",
+        "d3-time-format",
+        "internmap",
+        "use-debounce",
+      ],
     },
   } satisfies UserConfig;
 });

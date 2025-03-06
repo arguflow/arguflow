@@ -1,6 +1,6 @@
 {
   "name": "trieve-fern-adapter",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "type": "module",
   "main": "dist/index.js",
   "bin": "dist/index.js",
@@ -9,6 +9,8 @@
       "import": "./dist/index.js"
     }
   },
+  "private": false,
+  "description": "Trieve adapter for Fern",
   "publishConfig": {
     "access": "public"
   },

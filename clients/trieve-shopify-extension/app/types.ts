@@ -21,6 +21,7 @@ export type Product = {
   bodyHtml: string;
   handle: string;
   tags: string[];
+  status: "ACTIVE" | "ARCHIVED" | "DRAFT";
   category: {
     name: string;
   };

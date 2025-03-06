@@ -72,7 +72,11 @@ const extractChunksFromPath = async (
   path: string,
   rootUrl: string | undefined = undefined,
 ): Promise<ChunkReqPayload[]> => {
-  const window = new Window();
+  const window = new Window({
+    settings: {
+      disableJavaScriptEvaluation: true,
+    },
+  });
   const document = window.document;
   const chunks: ChunkReqPayload[] = [];
   let tuples: [string, string][] = [];
@@ -322,7 +326,6 @@ export const trieve = new TrieveSDK({
   apiKey: trieveApiKey,
   datasetId: trieveDatasetTrackingId,
   organizationId: trieveOrganizationId,
-  omitCredentials: true,
 });
 
 try {
