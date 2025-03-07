@@ -17,7 +17,7 @@ services:
       - "7432:5432"
 
   shopify-plugin:
-    image: trieve/shopify-plugin:dens-test
+    image: trieve/shopify-plugin:2025
     build:
       context: .
     ports:

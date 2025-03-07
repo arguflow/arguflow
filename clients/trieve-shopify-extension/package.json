@@ -43,7 +43,7 @@
     "prisma": "^5.11.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "trieve-ts-sdk": "../ts-sdk/dist",
+    "trieve-ts-sdk": "*",
     "vite-tsconfig-paths": "^5.0.1"
   },
   "devDependencies": {

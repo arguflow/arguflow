@@ -51,7 +51,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: [
         (process.env.TRIEVE_AUTH_URL || env.TRIEVE_AUTH_URL)!.replace(
           "https://",
-          ""
+          "",
         ),
       ],
     },
@@ -69,9 +69,6 @@ export default defineConfig(({ mode }) => {
       }),
       tsconfigPaths(),
     ],
-    build: {
-      assetsInlineLimit: 0,
-    },
     ssr: {
       noExternal: [
         "@shopify/polaris-viz",
