@@ -14,7 +14,6 @@ import {
 } from "@shopify/polaris";
 import { useEffect, useRef, useState } from "react";
 import { subDays, subHours, subMinutes, subMonths } from "date-fns";
-import { formatDateForApi } from "../../queries/analytics/formatting";
 import { Granularity } from "trieve-ts-sdk";
 
 // Types from the original code

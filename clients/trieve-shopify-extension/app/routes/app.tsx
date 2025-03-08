@@ -1,4 +1,5 @@
 import type { HeadersFunction } from "@remix-run/node";
+import { Chart, registerables } from "chart.js";
 import {
   Link,
   Outlet,
@@ -13,6 +14,7 @@ import { AppProvider } from "@shopify/shopify-app-remix/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import "@shopify/polaris-viz/build/esm/styles.css";
+import "../routes/_index/tailwind.css";
 import { MustLoginPage } from "app/components/MustLoginPage";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
@@ -26,6 +28,7 @@ export const loader = async () => {
 
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
+  Chart.register(...registerables);
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>

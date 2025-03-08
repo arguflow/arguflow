@@ -27,8 +27,6 @@ export const action = async ({ request }: LoaderFunctionArgs) => {
 
   const decoded = jwt.decode(idToken.toString()) as JwtPayload;
 
-  const now = Math.floor(Date.now() / 1000);
-
   if (type === "insert") {
     const key = await prisma.apiKey.create({
       data: {
@@ -101,7 +99,7 @@ export default function App() {
             idToken: params.get("token"),
             type: "insert",
           },
-          { method: "POST" }
+          { method: "POST" },
         );
       });
     });

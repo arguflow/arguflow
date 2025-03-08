@@ -1,4 +1,6 @@
-import { Box, Grid } from "@shopify/polaris";
+import { Grid } from "@shopify/polaris";
+import { HeadQueriesTable } from "app/components/analytics/search/HeadQueriesTable";
+import { NoResultQueriesTable } from "app/components/analytics/search/NoResultQueriesTable";
 import { SearchFilterBar } from "app/components/analytics/search/SearchFilterBar";
 import { SearchUsageChart } from "app/components/analytics/search/SearchUsageChart";
 import { defaultSearchAnalyticsFilter } from "app/queries/analytics/search";
@@ -17,8 +19,13 @@ export default function SearchAnalyticsPage() {
         setFilters={setFilters}
       />
       <Grid>
-        <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 3, lg: 3, xl: 3 }}>
+        <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
           <SearchUsageChart filters={filters} granularity={granularity} />
+          <div className="py-3"></div>
+          <NoResultQueriesTable filters={filters} granularity={granularity} />
+        </Grid.Cell>
+        <Grid.Cell columnSpan={{ xs: 6, sm: 6, md: 6, lg: 6, xl: 6 }}>
+          <HeadQueriesTable filters={filters} granularity={granularity} />
         </Grid.Cell>
       </Grid>
     </>

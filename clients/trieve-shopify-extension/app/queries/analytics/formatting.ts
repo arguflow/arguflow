@@ -1,5 +1,13 @@
 import { ChartState } from "@shopify/polaris-viz";
-import { differenceInHours, format } from "date-fns";
+import { DateRangeFilter } from "app/components/analytics/DateRangePicker";
+import {
+  differenceInHours,
+  eachDayOfInterval,
+  format,
+  isSameDay,
+  subDays,
+} from "date-fns";
+import { SearchAnalyticsFilter } from "trieve-ts-sdk";
 
 export const formatDateForApi = (date: Date) => {
   return date
@@ -35,6 +43,17 @@ export const parseCustomDateString = (dateString: string) => {
   const isoString = `${year}-${month}-${day}T${hour}:${minute}:${wholeSec}Z`;
 
   return new Date(isoString);
+};
+
+export const formatStringDateRangeToDates = (
+  range: SearchAnalyticsFilter["date_range"],
+): DateRangeWithDates => {
+  return {
+    gt: range?.gt ? parseCustomDateString(range.gt) : undefined,
+    lt: range?.lt ? parseCustomDateString(range.lt) : undefined,
+    gte: range?.gte ? parseCustomDateString(range.gte) : undefined,
+    lte: range?.lte ? parseCustomDateString(range.lte) : undefined,
+  };
 };
 
 interface HasDateRange {
@@ -139,4 +158,51 @@ export const queryStateToChartState = (
     return "Success" as ChartState;
   }
   return "Loading" as ChartState;
+};
+
+export const fillDate = <T>({
+  dataKey,
+  timestampKey,
+  data,
+  date_range,
+  defaultValue = 0,
+}: {
+  dataKey: keyof T;
+  timestampKey: keyof T;
+  data: T[];
+  date_range: SearchAnalyticsFilter["date_range"] | undefined;
+  defaultValue?: number | null;
+}) => {
+  console.log("date_range", date_range);
+  const startDate = date_range?.gte || subDays(new Date(), 7);
+  const endDate = date_range?.lte || new Date();
+
+  const info = eachDayOfInterval({
+    start: startDate,
+    end: endDate,
+  }).map((d) => {
+    let foundDataPoint = null;
+
+    for (const curr of data) {
+      const parsedDate = new Date(
+        parseCustomDateString(curr[timestampKey] as string),
+      );
+      if (isSameDay(parsedDate, d)) {
+        foundDataPoint = {
+          time: parsedDate,
+          value: (curr[dataKey] as number) || 0, // Use || 0 to handle undefined/null
+        };
+        break; // Exit loop after finding a match
+      }
+    }
+
+    return foundDataPoint
+      ? foundDataPoint
+      : {
+          time: d,
+          value: defaultValue,
+        };
+  });
+
+  return info;
 };
