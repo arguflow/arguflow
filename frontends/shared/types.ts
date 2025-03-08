@@ -136,6 +136,7 @@ export interface ServerEnvsConfiguration {
   BM25_B?: number;
   BM25_K?: number;
   BM25_AVG_LEN?: number;
+  TASK_DEFINITION?: string;
 }
 
 export interface DefaultError {
@@ -305,6 +306,11 @@ export const availableRerankerModels = [
     id: "bge-reranker-large",
     name: "bge-reranker-large (hosted by Trieve)",
     url: null,
+  },
+  {
+    id: "aimon-rerank",
+    name: "AIMon Reranker (with AIMon API key)",
+    url: "https://pbe-api.aimon.ai/v2/detect",
   },
   {
     id: "rerank-v3.5",

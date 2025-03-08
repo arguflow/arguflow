@@ -90,6 +90,7 @@ export interface SearchOptions {
   multiQueries: MultiQuery[];
   audioBase64?: string;
   scoringOptions?: ScoringOptions;
+  taskDefinition?: string;
 }
 
 const initalState: SearchOptions = {

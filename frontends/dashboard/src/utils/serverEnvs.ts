@@ -34,4 +34,5 @@ export const defaultServerEnvsConfiguration: DatasetConfig = {
     enabled: false,
     api_key: "",
   },
+  TASK_DEFINITION: "",
 };

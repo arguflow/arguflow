@@ -18,6 +18,8 @@ import pprint
 import re  # noqa: F401
 import json
 
+from traitlets import default
+
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr
 from typing import Any, ClassVar, Dict, List, Optional, Union
 from typing_extensions import Annotated
@@ -62,7 +64,8 @@ class DatasetConfigurationDTO(BaseModel):
     system_prompt: Optional[StrictStr] = Field(default=None, description="The system prompt to use for the LLM", alias="SYSTEM_PROMPT")
     temperature: Optional[Union[StrictFloat, StrictInt]] = Field(default=None, description="The temperature to use", alias="TEMPERATURE")
     use_message_to_query_prompt: Optional[StrictBool] = Field(default=None, description="Whether to use the message to query prompt", alias="USE_MESSAGE_TO_QUERY_PROMPT")
-    __properties: ClassVar[List[str]] = ["BM25_AVG_LEN", "BM25_B", "BM25_ENABLED", "BM25_K", "DISABLE_ANALYTICS", "DISTANCE_METRIC", "EMBEDDING_BASE_URL", "EMBEDDING_MODEL_NAME", "EMBEDDING_QUERY_PREFIX", "EMBEDDING_SIZE", "FREQUENCY_PENALTY", "FULLTEXT_ENABLED", "INDEXED_ONLY", "LLM_BASE_URL", "LLM_DEFAULT_MODEL", "LOCKED", "MAX_LIMIT", "MAX_TOKENS", "MESSAGE_TO_QUERY_PROMPT", "N_RETRIEVALS_TO_INCLUDE", "PAGEFIND_ENABLED", "PRESENCE_PENALTY", "PUBLIC_DATASET", "QDRANT_ONLY", "RAG_PROMPT", "RERANKER_BASE_URL", "RERANKER_MODEL_NAME", "SEMANTIC_ENABLED", "STOP_TOKENS", "SYSTEM_PROMPT", "TEMPERATURE", "USE_MESSAGE_TO_QUERY_PROMPT"]
+    task_definition: Optional[StrictStr] = Field(default=None, description="The task definition defined for AIMon reranker", alias="TASK_DEFINITION")
+    __properties: ClassVar[List[str]] = ["BM25_AVG_LEN", "BM25_B", "BM25_ENABLED", "BM25_K", "DISABLE_ANALYTICS", "DISTANCE_METRIC", "EMBEDDING_BASE_URL", "EMBEDDING_MODEL_NAME", "EMBEDDING_QUERY_PREFIX", "EMBEDDING_SIZE", "FREQUENCY_PENALTY", "FULLTEXT_ENABLED", "INDEXED_ONLY", "LLM_BASE_URL", "LLM_DEFAULT_MODEL", "LOCKED", "MAX_LIMIT", "MAX_TOKENS", "MESSAGE_TO_QUERY_PROMPT", "N_RETRIEVALS_TO_INCLUDE", "PAGEFIND_ENABLED", "PRESENCE_PENALTY", "PUBLIC_DATASET", "QDRANT_ONLY", "RAG_PROMPT", "RERANKER_BASE_URL", "RERANKER_MODEL_NAME", "SEMANTIC_ENABLED", "STOP_TOKENS", "SYSTEM_PROMPT", "TEMPERATURE", "USE_MESSAGE_TO_QUERY_PROMPT", "TASK_DEFINITION"]
 
     model_config = ConfigDict(
         populate_by_name=True,
@@ -266,6 +269,9 @@ class DatasetConfigurationDTO(BaseModel):
         if self.use_message_to_query_prompt is None and "use_message_to_query_prompt" in self.model_fields_set:
             _dict['USE_MESSAGE_TO_QUERY_PROMPT'] = None
 
+        if self.task_definition is None and "task_definition" in self.model_fields_set:
+            _dict['TASK_DEFINITION'] = None
+
         return _dict
 
     @classmethod
@@ -310,6 +316,7 @@ class DatasetConfigurationDTO(BaseModel):
             "SYSTEM_PROMPT": obj.get("SYSTEM_PROMPT"),
             "TEMPERATURE": obj.get("TEMPERATURE"),
             "USE_MESSAGE_TO_QUERY_PROMPT": obj.get("USE_MESSAGE_TO_QUERY_PROMPT")
+            "TASK_DEFINITION": obj.get("TASK_DEFINITION")
         })
         return _obj
 

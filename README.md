@@ -123,7 +123,7 @@ cargo install cargo-watch
 cp .env.analytics ./frontends/analytics/.env
 cp .env.chat ./frontends/chat/.env
 cp .env.search ./frontends/search/.env
-cp .env.server ./server/.env
+cp .env.example ./server/.env
 cp .env.dashboard ./frontends/dashboard/.env
 ```
 
@@ -136,6 +136,17 @@ cp .env.dashboard ./frontends/dashboard/.env
 1. Open the `./server/.env` file
 2. Replace the value for `LLM_API_KEY` to be your own OpenAI API key.
 3. Replace the value for `OPENAI_API_KEY` to be your own OpenAI API key.
+
+### Export the following keys in your terminal for local dev
+
+The PAGEFIND_CDN_BASE_URL and S3_SECRET_KEY_CSVJSONL could be set to a random list of strings.
+
+```
+export OPENAI_API_KEY="your_OpenAI_api_key" \
+LLM_API_KEY="your_OpenAI_api_key" \
+PAGEFIND_CDN_BASE_URL="lZP8X4h0Q5Sj2ZmV,aAmu1W92T6DbFUkJ,DZ5pMvz8P1kKNH0r,QAqwvKh8rI5sPmuW,YMwgsBz7jLfN0oX8" \
+S3_SECRET_KEY_CSVJSONL="Gq6wzS3mjC5kL7i4KwexnL3gP8Z1a5Xv,V2c4ZnL0uHqBzFvR2NcN8Pb1g6CjmX9J,TfA1h8LgI5zYkH9A9p7NvWlL0sZzF9p8N,pKr81pLq5n6MkNzT1X09R7Qb0Vn5cFr0d,DzYwz82FQiW6T3u9A4z9h7HLOlJb7L2V1"
+```
 
 ### Start docker container services needed for local dev
 
@@ -188,9 +199,19 @@ yarn dev
 
 ### Verify Working Setup
 
+After the cargo build has finished (after the `tmuxp load trieve`):
 - check that you can see redoc with the OpenAPI reference at [localhost:8090/redoc](http://localhost:8090/redoc)
 - make an account create a dataset with test data at [localhost:5173](http://localhost:5173)
 - search that dataset with test data at [localhost:5174](http://localhost:5174)
+
+### Additional Instructions for testing cross encoder reranking models
+
+To test the Cross Encoder rerankers in local dev, 
+- click on the dataset, go to the Dataset Settings -> Dataset Options -> Additional Options and uncheck the `Fulltext Enabled` option.
+- in the Embedding Settings, select your reranker model and enter the respective key in the adjacent textbox, and hit save.
+- in the search playground, set Type -> Semantic and select Rerank By -> Cross Encoder
+- if AIMon Reranker is selected in the Embedding Settings, you can enter an optional Task Definition in the search playground to specify the domain of context documents to the AIMon reranker.
+
 
 ### Debugging issues with local dev
 

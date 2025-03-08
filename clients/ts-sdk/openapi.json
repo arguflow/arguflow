@@ -9378,7 +9378,8 @@
             ],
             "SYSTEM_PROMPT": "You are a helpful assistant",
             "TEMPERATURE": 0.5,
-            "USE_MESSAGE_TO_QUERY_PROMPT": false
+            "USE_MESSAGE_TO_QUERY_PROMPT": false,
+            "TASK_DEFINITION":"Your task is to grade the relevance of context document(s) against the specified user query."
           }
         }
       },
@@ -9832,7 +9833,8 @@
             ],
             "SYSTEM_PROMPT": "You are a helpful assistant",
             "TEMPERATURE": 0.5,
-            "USE_MESSAGE_TO_QUERY_PROMPT": false
+            "USE_MESSAGE_TO_QUERY_PROMPT": false,
+            "TASK_DEFINITION":"Your task is to grade the relevance of context document(s) against the specified user query."
           },
           "tracking_id": "foobar-dataset",
           "updated_at": "2021-01-01 00:00:00.000"
@@ -10102,6 +10104,11 @@
             "type": "boolean",
             "description": "Whether to use the message to query prompt",
             "nullable": true
+          },
+          "TASK_DEFINITION": {
+            "type": "string",
+            "description": "The task definition for AIMon reranker.",
+            "nullable": true
           }
         },
         "example": {
@@ -10133,7 +10140,8 @@
           ],
           "SYSTEM_PROMPT": "You are a helpful assistant",
           "TEMPERATURE": 0.5,
-          "USE_MESSAGE_TO_QUERY_PROMPT": false
+          "USE_MESSAGE_TO_QUERY_PROMPT": false,
+          "TASK_DEFINITION":"Your task is to grade the relevance of context document(s) against the specified user query."
         }
       },
       "DatasetDTO": {
@@ -17405,7 +17413,8 @@
             ],
             "SYSTEM_PROMPT": "You are a helpful assistant",
             "TEMPERATURE": 0.5,
-            "USE_MESSAGE_TO_QUERY_PROMPT": false
+            "USE_MESSAGE_TO_QUERY_PROMPT": false,
+            "TASK_DEFINITION":"Your task is to grade the relevance of context document(s) against the specified user query."
           }
         }
       },
@@ -17715,7 +17724,8 @@
             ],
             "SYSTEM_PROMPT": "You are a helpful assistant",
             "TEMPERATURE": 0.5,
-            "USE_MESSAGE_TO_QUERY_PROMPT": false
+            "USE_MESSAGE_TO_QUERY_PROMPT": false,
+            "TASK_DEFINITION":"Your task is to grade the relevance of context document(s) against the specified user query."
           }
         }
       },
